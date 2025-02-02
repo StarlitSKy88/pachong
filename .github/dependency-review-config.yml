@@ -1,0 +1,72 @@
+# 依赖审查配置
+rules:
+  # 严重性规则
+  - name: high-severity-vulnerabilities
+    description: Block high severity vulnerabilities
+    paths:
+      - requirements.txt
+      - setup.py
+      - pyproject.toml
+    severity:
+      - high
+      - critical
+    action: block
+
+  # 许可证规则
+  - name: forbidden-licenses
+    description: Block forbidden licenses
+    paths:
+      - requirements.txt
+      - setup.py
+      - pyproject.toml
+    licenses:
+      - AGPL-1.0-or-later
+      - LGPL-2.0-or-later
+    action: block
+
+  # 依赖更新规则
+  - name: version-updates
+    description: Warn about available version updates
+    paths:
+      - requirements.txt
+      - setup.py
+      - pyproject.toml
+    updates:
+      - type: version
+        pattern: ".*"
+    action: warn
+
+# 扫描配置
+scanning:
+  - path-patterns:
+      - requirements.txt
+      - setup.py
+      - pyproject.toml
+    exclude-patterns:
+      - tests/**
+      - docs/**
+    max-depth: 10
+
+# 报告配置
+reporting:
+  fail-on:
+    - high
+    - critical
+  ignore:
+    - CVE-2021-XXXXX  # 已知的误报
+    - GHSA-XXXXX      # 已修复但未更新的CVE
+
+# 通知配置
+notifications:
+  slack:
+    enabled: true
+    channel: "#security"
+    on:
+      - high
+      - critical
+
+# 缓存配置
+cache:
+  enabled: true
+  ttl: 24h
+  max-size: 1GB 

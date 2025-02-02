@@ -1,0 +1,77 @@
+name: Bug报告
+description: 创建一个bug报告以帮助我们改进
+title: "[Bug]: "
+labels: ["bug"]
+assignees:
+  - your-username
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢您花时间填写这个bug报告！
+  
+  - type: input
+    id: version
+    attributes:
+      label: 版本
+      description: 您使用的是哪个版本？
+      placeholder: 例如：v0.1.0
+    validations:
+      required: true
+
+  - type: dropdown
+    id: environment
+    attributes:
+      label: 环境
+      description: 这个bug出现在哪个环境？
+      options:
+        - 开发环境
+        - 测试环境
+        - 预生产环境
+        - 生产环境
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: 发生了什么？
+      description: 请详细描述bug的表现。
+      placeholder: 告诉我们您看到了什么！
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望行为
+      description: 您期望看到什么？
+      placeholder: 描述正确的行为应该是什么样的。
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: 复现步骤
+      description: 如何复现这个问题？
+      placeholder: |
+        1. 进入 '...'
+        2. 点击 '....'
+        3. 滚动到 '....'
+        4. 看到错误
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 相关日志
+      description: 请复制并粘贴任何相关的日志输出。
+      render: shell
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: 补充信息
+      description: 添加任何其他有关问题的上下文或截图。 

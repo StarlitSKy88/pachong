@@ -1,0 +1,69 @@
+include LICENSE
+include README.md
+include requirements.txt
+include pyproject.toml
+include setup.py
+include MANIFEST.in
+include .env.example
+
+recursive-include src *.py
+recursive-include src *.json
+recursive-include src *.yaml
+recursive-include src *.yml
+recursive-include src *.txt
+recursive-include src *.html
+recursive-include src *.css
+recursive-include src *.js
+recursive-include src *.png
+recursive-include src *.jpg
+recursive-include src *.gif
+recursive-include src *.svg
+
+recursive-include tests *.py
+recursive-include tests *.json
+recursive-include tests *.yaml
+recursive-include tests *.yml
+recursive-include tests *.txt
+
+recursive-include docs *.md
+recursive-include docs *.rst
+recursive-include docs *.py
+recursive-include docs *.html
+recursive-include docs *.css
+recursive-include docs *.js
+recursive-include docs *.png
+recursive-include docs *.jpg
+recursive-include docs *.gif
+recursive-include docs *.svg
+
+recursive-include config *.json
+recursive-include config *.yaml
+recursive-include config *.yml
+recursive-include config *.ini
+recursive-include config *.conf
+recursive-include config *.cfg
+
+recursive-include scripts *.sh
+recursive-include scripts *.py
+recursive-include scripts *.bat
+recursive-include scripts *.ps1
+
+recursive-include tools *.py
+recursive-include tools *.sh
+recursive-include tools *.bat
+recursive-include tools *.ps1
+
+prune .git
+prune .github
+prune .pytest_cache
+prune .coverage
+prune htmlcov
+prune dist
+prune build
+prune *.egg-info
+prune __pycache__
+prune *.pyc
+prune *.pyo
+prune *.pyd
+prune .Python
+prune *.so 

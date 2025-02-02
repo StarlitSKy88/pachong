@@ -1,0 +1,82 @@
+name: 问题咨询
+description: 提出一个使用相关的问题
+title: "[Question]: "
+labels: ["question"]
+assignees:
+  - your-username
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢您提出这个问题！在提问之前，请确保您已经：
+        1. 搜索过现有的issues
+        2. 查看过项目文档
+        3. 尝试过自行解决
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: 问题类别
+      description: 这是什么类型的问题？
+      options:
+        - 使用方法
+        - 配置问题
+        - API使用
+        - 性能问题
+        - 部署问题
+        - 其他
+    validations:
+      required: true
+
+  - type: textarea
+    id: question
+    attributes:
+      label: 问题描述
+      description: 请详细描述您的问题
+      placeholder: 我想知道如何...
+    validations:
+      required: true
+
+  - type: textarea
+    id: tried
+    attributes:
+      label: 已尝试的方案
+      description: 您已经尝试过哪些方案？
+      placeholder: 我尝试过...
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: 版本
+      description: 您使用的是哪个版本？
+      placeholder: 例如：v0.1.0
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: 环境信息
+      description: 请提供您的环境信息
+      value: |
+        - 操作系统：
+        - Python版本：
+        - 依赖版本：
+        - 其他相关信息：
+    validations:
+      required: true
+
+  - type: textarea
+    id: code
+    attributes:
+      label: 相关代码
+      description: 如果适用，请提供相关的代码片段
+      render: python
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: 补充信息
+      description: 添加任何其他有助于解答问题的信息。 

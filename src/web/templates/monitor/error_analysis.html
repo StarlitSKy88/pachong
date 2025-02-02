@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>错误分析</title>
+    <style>
+        .error-analysis { padding: 20px; }
+        .error-summary { margin-bottom: 20px; }
+        .stats { display: flex; gap: 20px; }
+        .error-list table { width: 100%; border-collapse: collapse; }
+        .error-list th, .error-list td { padding: 8px; text-align: left; border: 1px solid #ddd; }
+        .error-list th { background-color: #f5f5f5; }
+    </style>
+</head>
+<body>
+    <div class="error-analysis">
+        <div class="error-summary">
+            <h3>错误统计</h3>
+            <div class="stats">
+                <div>总错误数: {{ error_stats.total }}</div>
+                <div>今日错误: {{ error_stats.today }}</div>
+                <div>主要错误类型: {{ error_stats.main_type }}</div>
+            </div>
+        </div>
+        
+        <div class="error-list">
+            <h3>最近错误</h3>
+            <table>
+                <tr>
+                    <th>时间</th>
+                    <th>类型</th>
+                    <th>URL</th>
+                    <th>详情</th>
+                </tr>
+                {% for error in errors %}
+                <tr>
+                    <td>{{ error.timestamp }}</td>
+                    <td>{{ error.type }}</td>
+                    <td>{{ error.url }}</td>
+                    <td>{{ error.message }}</td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+    </div>
+</body>
+</html> 

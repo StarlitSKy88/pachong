@@ -1,0 +1,255 @@
+version: '3.8'
+
+services:
+  # API服务
+  api:
+    build:
+      context: .
+      dockerfile: docker/api/Dockerfile
+    image: crawler-api:latest
+    container_name: crawler-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=production
+      - DATABASE_URL=postgresql://app_user:password@postgres:5432/crawler
+      - REDIS_URL=redis://redis:6379/0
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+      - INFLUXDB_URL=http://influxdb:8086
+    volumes:
+      - ./:/app
+      - ./logs:/app/logs
+    depends_on:
+      - postgres
+      - redis
+      - elasticsearch
+      - influxdb
+    networks:
+      - crawler-network
+
+  # 爬虫工作器
+  crawler:
+    build:
+      context: .
+      dockerfile: docker/crawler/Dockerfile
+    image: crawler-worker:latest
+    container_name: crawler-worker
+    restart: unless-stopped
+    environment:
+      - ENVIRONMENT=production
+      - DATABASE_URL=postgresql://app_user:password@postgres:5432/crawler
+      - REDIS_URL=redis://redis:6379/0
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+    volumes:
+      - ./:/app
+      - ./logs:/app/logs
+    depends_on:
+      - postgres
+      - redis
+      - elasticsearch
+    networks:
+      - crawler-network
+
+  # 处理工作器
+  processor:
+    build:
+      context: .
+      dockerfile: docker/processor/Dockerfile
+    image: crawler-processor:latest
+    container_name: crawler-processor
+    restart: unless-stopped
+    environment:
+      - ENVIRONMENT=production
+      - DATABASE_URL=postgresql://app_user:password@postgres:5432/crawler
+      - REDIS_URL=redis://redis:6379/0
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+    volumes:
+      - ./:/app
+      - ./logs:/app/logs
+    depends_on:
+      - postgres
+      - redis
+      - elasticsearch
+    networks:
+      - crawler-network
+
+  # 生成工作器
+  generator:
+    build:
+      context: .
+      dockerfile: docker/generator/Dockerfile
+    image: crawler-generator:latest
+    container_name: crawler-generator
+    restart: unless-stopped
+    environment:
+      - ENVIRONMENT=production
+      - DATABASE_URL=postgresql://app_user:password@postgres:5432/crawler
+      - REDIS_URL=redis://redis:6379/0
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+    volumes:
+      - ./:/app
+      - ./logs:/app/logs
+    depends_on:
+      - postgres
+      - redis
+      - elasticsearch
+    networks:
+      - crawler-network
+
+  # PostgreSQL数据库
+  postgres:
+    image: postgres:13-alpine
+    container_name: crawler-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=app_user
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=crawler
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - crawler-network
+
+  # Redis缓存
+  redis:
+    image: redis:6-alpine
+    container_name: crawler-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - crawler-network
+
+  # Elasticsearch搜索引擎
+  elasticsearch:
+    image: elasticsearch:7.17.9
+    container_name: crawler-elasticsearch
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+    networks:
+      - crawler-network
+
+  # InfluxDB时序数据库
+  influxdb:
+    image: influxdb:2.7
+    container_name: crawler-influxdb
+    restart: unless-stopped
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=admin
+      - DOCKER_INFLUXDB_INIT_PASSWORD=password
+      - DOCKER_INFLUXDB_INIT_ORG=crawler
+      - DOCKER_INFLUXDB_INIT_BUCKET=metrics
+    volumes:
+      - influxdb_data:/var/lib/influxdb2
+    ports:
+      - "8086:8086"
+    networks:
+      - crawler-network
+
+  # Prometheus监控
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    container_name: crawler-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./prometheus:/etc/prometheus
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    ports:
+      - "9090:9090"
+    networks:
+      - crawler-network
+
+  # Grafana可视化
+  grafana:
+    image: grafana/grafana:10.0.3
+    container_name: crawler-grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - crawler-network
+
+  # Kibana日志可视化
+  kibana:
+    image: kibana:7.17.9
+    container_name: crawler-kibana
+    restart: unless-stopped
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+    networks:
+      - crawler-network
+
+  # Filebeat日志收集
+  filebeat:
+    image: elastic/filebeat:7.17.9
+    container_name: crawler-filebeat
+    restart: unless-stopped
+    volumes:
+      - ./filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - ./logs:/var/log/app:ro
+    depends_on:
+      - elasticsearch
+      - kibana
+    networks:
+      - crawler-network
+
+  # Nginx反向代理
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: crawler-nginx
+    restart: unless-stopped
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./static:/usr/share/nginx/html/static:ro
+      - ./media:/usr/share/nginx/html/media:ro
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - api
+    networks:
+      - crawler-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  elasticsearch_data:
+  influxdb_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  crawler-network:
+    driver: bridge 

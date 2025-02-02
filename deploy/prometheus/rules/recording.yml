@@ -1,0 +1,86 @@
+groups:
+  - name: recording_rules
+    rules:
+      # API服务指标
+      - record: job:api_request_duration_seconds:avg_rate5m
+        expr: rate(api_request_duration_seconds_sum[5m]) / rate(api_request_duration_seconds_count[5m])
+
+      - record: job:api_requests_total:rate5m
+        expr: rate(api_requests_total[5m])
+
+      - record: job:api_errors_total:rate5m
+        expr: rate(api_errors_total[5m])
+
+      # 爬虫服务指标
+      - record: job:crawler_requests_total:rate5m
+        expr: rate(crawler_requests_total[5m])
+
+      - record: job:crawler_success_total:rate5m
+        expr: rate(crawler_success_total[5m])
+
+      - record: job:crawler_error_total:rate5m
+        expr: rate(crawler_error_total[5m])
+
+      - record: job:crawler_success_rate:ratio_rate5m
+        expr: rate(crawler_success_total[5m]) / rate(crawler_requests_total[5m])
+
+      # 处理器服务指标
+      - record: job:processor_tasks_total:rate5m
+        expr: rate(processor_tasks_total[5m])
+
+      - record: job:processor_success_total:rate5m
+        expr: rate(processor_success_total[5m])
+
+      - record: job:processor_error_total:rate5m
+        expr: rate(processor_error_total[5m])
+
+      - record: job:processor_success_rate:ratio_rate5m
+        expr: rate(processor_success_total[5m]) / rate(processor_tasks_total[5m])
+
+      # 生成器服务指标
+      - record: job:generator_tasks_total:rate5m
+        expr: rate(generator_tasks_total[5m])
+
+      - record: job:generator_success_total:rate5m
+        expr: rate(generator_success_total[5m])
+
+      - record: job:generator_error_total:rate5m
+        expr: rate(generator_error_total[5m])
+
+      - record: job:generator_success_rate:ratio_rate5m
+        expr: rate(generator_success_total[5m]) / rate(generator_tasks_total[5m])
+
+      # 资源使用指标
+      - record: job:process_cpu_seconds:rate5m
+        expr: rate(process_cpu_seconds_total[5m])
+
+      - record: job:process_resident_memory_bytes:avg5m
+        expr: avg_over_time(process_resident_memory_bytes[5m])
+
+      # HTTP请求指标
+      - record: job:http_requests_total:rate5m
+        expr: rate(http_requests_total[5m])
+
+      - record: job:http_request_duration_seconds:avg_rate5m
+        expr: rate(http_request_duration_seconds_sum[5m]) / rate(http_request_duration_seconds_count[5m])
+
+      # 数据库指标
+      - record: job:database_connections:avg5m
+        expr: avg_over_time(database_connections[5m])
+
+      - record: job:database_queries_total:rate5m
+        expr: rate(database_queries_total[5m])
+
+      # Redis指标
+      - record: job:redis_connected_clients:avg5m
+        expr: avg_over_time(redis_connected_clients[5m])
+
+      - record: job:redis_commands_total:rate5m
+        expr: rate(redis_commands_total[5m])
+
+      # 系统指标
+      - record: job:node_cpu_usage:avg5m
+        expr: 100 - avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m]) * 100)
+
+      - record: job:node_memory_usage:avg5m
+        expr: 100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) 

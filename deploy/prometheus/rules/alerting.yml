@@ -1,0 +1,145 @@
+groups:
+  - name: alert_rules
+    rules:
+      # 服务可用性告警
+      - alert: ServiceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "服务 {{ $labels.job }} 已停止"
+          description: "服务 {{ $labels.job }} 在 {{ $labels.instance }} 已停止运行超过1分钟"
+
+      # API服务告警
+      - alert: APIHighErrorRate
+        expr: rate(api_errors_total[5m]) / rate(api_requests_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "API错误率过高"
+          description: "API错误率在过去5分钟超过10%"
+
+      - alert: APIHighLatency
+        expr: rate(api_request_duration_seconds_sum[5m]) / rate(api_request_duration_seconds_count[5m]) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "API响应时间过长"
+          description: "API平均响应时间在过去5分钟超过1秒"
+
+      # 爬虫服务告警
+      - alert: CrawlerHighErrorRate
+        expr: rate(crawler_error_total[5m]) / rate(crawler_requests_total[5m]) > 0.2
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "爬虫错误率过高"
+          description: "爬虫错误率在过去5分钟超过20%"
+
+      - alert: CrawlerLowSuccessRate
+        expr: rate(crawler_success_total[5m]) / rate(crawler_requests_total[5m]) < 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "爬虫成功率过低"
+          description: "爬虫成功率在过去5分钟低于80%"
+
+      # 处理器服务告警
+      - alert: ProcessorHighErrorRate
+        expr: rate(processor_error_total[5m]) / rate(processor_tasks_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "处理器错误率过高"
+          description: "处理器错误率在过去5分钟超过10%"
+
+      - alert: ProcessorLowSuccessRate
+        expr: rate(processor_success_total[5m]) / rate(processor_tasks_total[5m]) < 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "处理器成功率过低"
+          description: "处理器成功率在过去5分钟低于90%"
+
+      # 生成器服务告警
+      - alert: GeneratorHighErrorRate
+        expr: rate(generator_error_total[5m]) / rate(generator_tasks_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "生成器错误率过高"
+          description: "生成器错误率在过去5分钟超过10%"
+
+      - alert: GeneratorLowSuccessRate
+        expr: rate(generator_success_total[5m]) / rate(generator_tasks_total[5m]) < 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "生成器成功率过低"
+          description: "生成器成功率在过去5分钟低于90%"
+
+      # 资源使用告警
+      - alert: HighCPUUsage
+        expr: job:node_cpu_usage:avg5m > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "CPU使用率过高"
+          description: "CPU使用率在过去5分钟超过80%"
+
+      - alert: HighMemoryUsage
+        expr: job:node_memory_usage:avg5m > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "内存使用率过高"
+          description: "内存使用率在过去5分钟超过80%"
+
+      # 数据库告警
+      - alert: HighDatabaseConnections
+        expr: job:database_connections:avg5m > 100
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "数据库连接数过高"
+          description: "数据库连接数在过去5分钟超过100"
+
+      - alert: HighDatabaseQueryRate
+        expr: job:database_queries_total:rate5m > 1000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "数据库查询率过高"
+          description: "数据库查询率在过去5分钟超过1000/s"
+
+      # Redis告警
+      - alert: HighRedisConnections
+        expr: job:redis_connected_clients:avg5m > 100
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis连接数过高"
+          description: "Redis连接数在过去5分钟超过100"
+
+      - alert: HighRedisCommandRate
+        expr: job:redis_commands_total:rate5m > 1000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis命令率过高"
+          description: "Redis命令率在过去5分钟超过1000/s" 

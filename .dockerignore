@@ -1,0 +1,218 @@
+# Git
+.git
+.gitignore
+.gitattributes
+.github/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# 虚拟环境
+venv/
+env/
+ENV/
+.env
+.venv
+env.bak/
+venv.bak/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
+.vs/
+
+# 测试
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+htmlcov/
+
+# 文档
+docs/_build/
+docs/api/
+site/
+
+# 日志
+logs/
+*.log
+log/
+tmp/
+temp/
+
+# 数据库
+*.sqlite3
+*.db
+*.sql
+*.dump
+
+# 媒体文件
+media/
+static/
+uploads/
+downloads/
+
+# 缓存
+.cache/
+.sass-cache/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# 系统文件
+.DS_Store
+Thumbs.db
+desktop.ini
+*.bak
+*.swp
+*.swo
+*~
+
+# 配置文件
+.env
+.env.*
+!.env.example
+config.ini
+*.conf
+*.cfg
+
+# 依赖
+node_modules/
+bower_components/
+*.min.js
+*.min.css
+
+# 构建
+dist/
+build/
+*.egg-info/
+*.egg
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# 文档
+docs/_build/
+docs/api/
+site/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre
+.pyre/
+
+# pytype
+.pytype/
+
+# Cython
+*.c
+*.so
+
+# 打包
+*.tar.gz
+*.zip
+*.rar
+*.7z
+
+# 证书
+*.pem
+*.key
+*.crt
+*.cer
+*.der
+*.priv
+
+# Docker
+.docker/
+docker-compose.override.yml
+
+# 其他
+*.bak
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+.env
+.env.*
+!.env.example
+*.log
+*.sqlite3
+.idea/
+.vscode/
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+.tox/
+.cache/
+.hypothesis/
+.mypy_cache/
+
+# 项目特定
+data/
+models/
+checkpoints/
+results/
+output/
+temp/
+tmp/
+.cookies/
+.proxies/
+screenshots/
+downloads/
+uploads/
+media/
+static/
+logs/
+*.db
+*.sqlite3
+*.log
+.env
+config.local.yaml 

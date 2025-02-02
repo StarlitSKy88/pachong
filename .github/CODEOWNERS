@@ -1,0 +1,52 @@
+# 这是一个CODEOWNERS文件，用于定义代码的所有者
+# 每一行的格式为：文件模式 所有者1 所有者2
+
+# 默认所有者
+*       @your-username
+
+# 文档
+/docs/  @your-username @docs-team
+
+# 源代码
+/src/   @your-username @dev-team
+/src/crawlers/     @crawler-team
+/src/processors/   @processor-team
+/src/generators/   @generator-team
+/src/analyzers/    @analyzer-team
+/src/models/       @model-team
+/src/utils/        @util-team
+
+# 测试
+/tests/  @your-username @test-team
+
+# 配置文件
+*.yml    @your-username @devops-team
+*.yaml   @your-username @devops-team
+*.json   @your-username @devops-team
+*.toml   @your-username @devops-team
+*.ini    @your-username @devops-team
+
+# Docker相关
+/docker/           @devops-team
+Dockerfile        @devops-team
+docker-compose.yml @devops-team
+
+# CI/CD
+/.github/         @your-username @devops-team
+/.github/workflows/    @devops-team
+
+# 依赖管理
+requirements.txt  @your-username @security-team
+requirements-dev.txt @your-username @security-team
+setup.py         @your-username @security-team
+pyproject.toml   @your-username @security-team
+
+# 安全相关
+SECURITY.md      @security-team
+.github/SECURITY.md @security-team
+
+# 文档相关
+*.md             @docs-team
+/docs/           @docs-team
+CHANGELOG.md     @your-username @docs-team
+README.md        @your-username @docs-team 

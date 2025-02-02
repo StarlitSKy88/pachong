@@ -1,0 +1,147 @@
+---
+description: This rule defines project conventions and guidelines for our crawler project, including development environment setup, code organization, tools usage, version control practices, and configuration management. It helps maintain consistency and quality across the project.
+globs: *.py, *.md, *.html, requirements.txt, .env*, .gitignore, tools/**, tests/**, src/**
+---
+
+# Instructions
+# 使用说明
+
+During you interaction with the user, if you find anything reusable in this project (e.g. version of a library, model name), especially about a fix to a mistake you made or a correction you received, you should take note in the `Lessons` section in the `.cursorrules` file so you will not make the same mistake again.
+# 在与用户交互过程中，如果你发现项目中有任何可重用的内容（例如：库的版本、模型名称），特别是关于你犯过的错误的修复或收到的纠正，你应该在 `.cursorrules` 文件的 `经验教训` 部分做记录，这样你就不会再犯同样的错误。
+
+You should also use the `.cursorrules` file as a scratchpad to organize your thoughts. Especially when you receive a new task, you should first review the content of the scratchpad, clear old different task if necessary, first explain the task, and plan the steps you need to take to complete the task. You can use todo markers to indicate the progress, e.g.
+# 你还应该使用 `.cursorrules` 文件作为草稿本来组织你的思路。特别是当你收到新任务时，你应该：
+# 1. 首先回顾草稿本的内容
+# 2. 如有必要，清除旧的不相关任务
+# 3. 先解释任务内容
+# 4. 规划完成任务所需的步骤
+
+[X] Task 1
+[ ] Task 2
+# [X] 任务1
+# [ ] 任务2
+
+Also update the progress of the task in the Scratchpad when you finish a subtask.
+Especially when you finished a milestone, it will help to improve your depth of task accomplishment to use the scratchpad to reflect and plan.
+The goal is to help you maintain a big picture as well as the progress of the task. Always refer to the Scratchpad when you plan the next step.
+# 当你完成一个子任务时，也要在草稿本中更新任务进度。
+# 特别是当你完成一个里程碑时，使用草稿本来反思和规划将有助于提高你的任务完成深度。
+# 目标是帮助你同时掌握任务的全局视图和进度。在规划下一步时，始终参考草稿本。
+
+# Tools
+# 工具
+
+Note all the tools are in python. So in the case you need to do batch processing, you can always consult the python files and write your own script.
+# 注意所有工具都是用Python编写的。因此，如果你需要进行批处理，你可以随时查阅Python文件并编写自己的脚本。
+
+## Screenshot Verification
+# 截图验证
+The screenshot verification workflow allows you to capture screenshots of web pages and verify their appearance using LLMs. The following tools are available:
+# 截图验证工作流允许你捕获网页截图并使用LLM验证其外观。以下工具可用：
+
+1. Screenshot Capture:
+# 1. 截图捕获：
+```bash
+venv/bin/python tools/screenshot_utils.py URL [--output OUTPUT] [--width WIDTH] [--height HEIGHT]
+```
+
+2. LLM Verification with Images:
+# 2. 使用图像进行LLM验证：
+```bash
+venv/bin/python tools/llm_api.py --prompt "Your verification question" --provider {openai|anthropic} --image path/to/screenshot.png
+```
+
+Example workflow:
+# 示例工作流：
+```python
+from screenshot_utils import take_screenshot_sync
+from llm_api import query_llm
+
+# Take a screenshot
+# 获取截图
+screenshot_path = take_screenshot_sync('https://example.com', 'screenshot.png')
+
+# Verify with LLM
+# 使用LLM验证
+response = query_llm(
+    "What is the background color and title of this webpage?",  # 这个网页的背景颜色和标题是什么？
+    provider="openai",  # or "anthropic"  # 或 "anthropic"
+    image_path=screenshot_path
+)
+print(response)
+```
+
+## LLM
+# LLM（大语言模型）
+
+You always have an LLM at your side to help you with the task. For simple tasks, you could invoke the LLM by running the following command:
+# 你始终可以使用LLM来帮助你完成任务。对于简单任务，你可以通过运行以下命令来调用LLM：
+```
+venv/bin/python ./tools/llm_api.py --prompt "What is the capital of France?" --provider "anthropic"
+# venv/bin/python ./tools/llm_api.py --prompt "法国的首都是什么？" --provider "anthropic"
+```
+
+The LLM API supports multiple providers:
+# LLM API支持多个提供商：
+- OpenAI (default, model: gpt-4o)  # OpenAI（默认，模型：gpt-4o）
+- Azure OpenAI (model: configured via AZURE_OPENAI_MODEL_DEPLOYMENT in .env file, defaults to gpt-4o-ms)  # Azure OpenAI（模型：通过.env文件中的AZURE_OPENAI_MODEL_DEPLOYMENT配置，默认为gpt-4o-ms）
+- DeepSeek (model: deepseek-chat)  # DeepSeek（模型：deepseek-chat）
+- Anthropic (model: claude-3-sonnet-20240229)  # Anthropic（模型：claude-3-sonnet-20240229）
+- Gemini (model: gemini-pro)  # Gemini（模型：gemini-pro）
+- Local LLM (model: Qwen/Qwen2.5-32B-Instruct-AWQ)  # 本地LLM（模型：Qwen/Qwen2.5-32B-Instruct-AWQ）
+
+But usually it's a better idea to check the content of the file and use the APIs in the `tools/llm_api.py` file to invoke the LLM if needed.
+# 但通常更好的做法是查看文件内容，并在需要时使用 `tools/llm_api.py` 文件中的API来调用LLM。
+
+## Web browser
+# 网页浏览器
+
+You could use the `tools/web_scraper.py` file to scrape the web.
+# 你可以使用 `tools/web_scraper.py` 文件来抓取网页。
+```
+venv/bin/python ./tools/web_scraper.py --max-concurrent 3 URL1 URL2 URL3
+```
+This will output the content of the web pages.
+# 这将输出网页的内容。
+
+## Search engine
+# 搜索引擎
+
+You could use the `tools/search_engine.py` file to search the web.
+# 你可以使用 `tools/search_engine.py` 文件来搜索网页。
+```
+venv/bin/python ./tools/search_engine.py "your search keywords"
+# venv/bin/python ./tools/search_engine.py "你的搜索关键词"
+```
+This will output the search results in the following format:
+# 这将以以下格式输出搜索结果：
+```
+URL: https://example.com
+Title: This is the title of the search result  # 标题: 这是搜索结果的标题
+Snippet: This is a snippet of the search result  # 摘要: 这是搜索结果的摘要
+```
+If needed, you can further use the `web_scraper.py` file to scrape the web page content.
+# 如果需要，你可以进一步使用 `web_scraper.py` 文件来抓取网页内容。
+
+# Lessons
+# 经验教训
+
+## User Specified Lessons
+# 用户指定的经验教训
+
+- You have a python venv in ./venv. Use it.  # 你有一个Python虚拟环境在 ./venv 目录中。使用它。
+- Include info useful for debugging in the program output.  # 在程序输出中包含有助于调试的信息。
+- Read the file before you try to edit it.  # 在尝试编辑文件之前先阅读文件内容。
+- Due to Cursor's limit, when you use `git` and `gh` and need to submit a multiline commit message, first write the message in a file, and then use `git commit -F <filename>` or similar command to commit. And then remove the file. Include "[Cursor] " in the commit message and PR title.  # 由于Cursor的限制，当使用 `git` 和 `gh` 并需要提交多行提交消息时，先将消息写入文件，然后使用 `git commit -F <filename>` 或类似命令来提交。之后删除该文件。在提交消息和PR标题中包含 "[Cursor] "。
+
+## Cursor learned
+# Cursor学到的经验
+
+- For search results, ensure proper handling of different character encodings (UTF-8) for international queries  # 对于搜索结果，确保正确处理国际查询的不同字符编码（UTF-8）
+- Add debug information to stderr while keeping the main output clean in stdout for better pipeline integration  # 在stderr中添加调试信息，同时保持stdout中的主要输出清晰，以实现更好的管道集成
+- When using seaborn styles in matplotlib, use 'seaborn-v0_8' instead of 'seaborn' as the style name due to recent seaborn version changes  # 在使用seaborn样式时，由于最近seaborn版本的变化，使用'seaborn-v0_8'而不是'seaborn'作为样式名称
+- Use 'gpt-4o' as the model name for OpenAI's GPT-4 with vision capabilities  # 使用'gpt-4o'作为OpenAI的GPT-4（带视觉功能）的模型名称
+
+# Scratchpad
+# 草稿本
+

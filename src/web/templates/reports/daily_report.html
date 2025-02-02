@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>每日内容报告 - {{ date }}</title>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        h1, h2, h3 {
+            color: #2c3e50;
+            margin-top: 30px;
+        }
+        
+        h1 {
+            text-align: center;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #eee;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        
+        .stat-card {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .stat-card h4 {
+            margin: 0;
+            color: #6c757d;
+        }
+        
+        .stat-card .value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #007bff;
+            margin: 10px 0;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+        }
+        
+        tr:hover {
+            background-color: #f5f5f5;
+        }
+        
+        .chart {
+            margin: 20px 0;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .tag-cloud {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        
+        .tag {
+            background-color: #e9ecef;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 14px;
+        }
+        
+        .engagement-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin: 20px 0;
+        }
+        
+        .engagement-card {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .footer {
+            text-align: center;
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            color: #6c757d;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>每日内容报告 - {{ date }}</h1>
+        
+        <!-- 基础统计 -->
+        <h2>基础统计</h2>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h4>总内容数</h4>
+                <div class="value">{{ analysis.basic_stats.total_contents }}</div>
+            </div>
+            <div class="stat-card">
+                <h4>平台数</h4>
+                <div class="value">{{ analysis.basic_stats.total_platforms }}</div>
+            </div>
+            <div class="stat-card">
+                <h4>分类数</h4>
+                <div class="value">{{ analysis.basic_stats.total_categories }}</div>
+            </div>
+            <div class="stat-card">
+                <h4>作者数</h4>
+                <div class="value">{{ analysis.basic_stats.total_authors }}</div>
+            </div>
+        </div>
+        
+        <!-- 平台分布 -->
+        <h2>平台分布</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>平台</th>
+                    <th>内容数</th>
+                    <th>占比</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for platform, count in analysis.platform_stats.distribution.items() %}
+                <tr>
+                    <td>{{ platform }}</td>
+                    <td>{{ count }}</td>
+                    <td>{{ "%.2f"|format(analysis.platform_stats.percentage[platform]) }}%</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        
+        <!-- 互动数据 -->
+        <h2>互动数据分析</h2>
+        <div class="engagement-stats">
+            <div class="engagement-card">
+                <h3>点赞</h3>
+                <p>总数: {{ analysis.engagement_stats.likes.total }}</p>
+                <p>平均: {{ "%.2f"|format(analysis.engagement_stats.likes.avg) }}</p>
+                <p>最高: {{ analysis.engagement_stats.likes.max }}</p>
+            </div>
+            <div class="engagement-card">
+                <h3>评论</h3>
+                <p>总数: {{ analysis.engagement_stats.comments.total }}</p>
+                <p>平均: {{ "%.2f"|format(analysis.engagement_stats.comments.avg) }}</p>
+                <p>最高: {{ analysis.engagement_stats.comments.max }}</p>
+            </div>
+            <div class="engagement-card">
+                <h3>分享</h3>
+                <p>总数: {{ analysis.engagement_stats.shares.total }}</p>
+                <p>平均: {{ "%.2f"|format(analysis.engagement_stats.shares.avg) }}</p>
+                <p>最高: {{ analysis.engagement_stats.shares.max }}</p>
+            </div>
+        </div>
+        
+        <!-- 热门内容 -->
+        <h2>热门内容 Top 10</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>标题</th>
+                    <th>平台</th>
+                    <th>作者</th>
+                    <th>点赞</th>
+                    <th>评论</th>
+                    <th>分享</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for content in analysis.top_contents %}
+                <tr>
+                    <td><a href="{{ content.url }}" target="_blank">{{ content.title }}</a></td>
+                    <td>{{ content.platform }}</td>
+                    <td>{{ content.author }}</td>
+                    <td>{{ content.likes }}</td>
+                    <td>{{ content.comments }}</td>
+                    <td>{{ content.shares }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        
+        <!-- 标签分析 -->
+        <h2>热门标签</h2>
+        <div class="tag-cloud">
+            {% for tag, count in analysis.tag_stats.top_tags.items() %}
+            <span class="tag">{{ tag }} ({{ count }})</span>
+            {% endfor %}
+        </div>
+        
+        <!-- 发布时间分析 -->
+        <h2>发布时间分布</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>小时</th>
+                    <th>内容数</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for hour, count in analysis.time_stats.hourly_distribution.items() %}
+                <tr>
+                    <td>{{ hour }}:00</td>
+                    <td>{{ count }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        
+        <!-- 作者分析 -->
+        <h2>活跃作者 Top 10</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>作者</th>
+                    <th>平台</th>
+                    <th>总点赞</th>
+                    <th>总评论</th>
+                    <th>总分享</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for author in analysis.author_stats.top_authors %}
+                <tr>
+                    <td>{{ author.author }}</td>
+                    <td>{{ author.platform }}</td>
+                    <td>{{ author.likes }}</td>
+                    <td>{{ author.comments }}</td>
+                    <td>{{ author.shares }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        
+        <div class="footer">
+            <p>报告生成时间: {{ date }}</p>
+        </div>
+    </div>
+</body>
+</html> 

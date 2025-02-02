@@ -1,0 +1,47 @@
+
+{% extends "base.html" %}
+{% block content %}
+<div class="title">{{ title }} {{ emoji.sparkles }}</div>
+
+<div class="subtitle">
+    {{ emoji.calendar }} 今日精选 | {{ date }}
+</div>
+
+<div class="content">
+    <div class="highlight">
+        {{ emoji.bulb }} 今日要点：
+        {% for point in key_points %}
+        • {{ point }}
+        {% endfor %}
+    </div>
+
+    {% for category in categories %}
+    <div class="category">
+        <h2>{{ category.title }} {{ category.emoji }}</h2>
+        {% for item in category.items %}
+        <div class="item">
+            <div class="quote">{{ item.summary }}</div>
+            {% if item.key_points %}
+            <ul>
+                {% for point in item.key_points %}
+                <li>{{ point }}</li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    <div class="divider"></div>
+    {% endfor %}
+
+    <div class="tips">
+        {{ emoji.light_bulb }} 小贴士：关注我，每天为您精选科技圈最新动态！
+    </div>
+
+    <div class="tags">
+        {% for tag in tags %}
+        <span class="tag">#{{ tag }}</span>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,49 @@
+
+{% extends "base.html" %}
+{% block content %}
+<div class="title">{{ title }} {{ emoji.star }}</div>
+
+<div class="content">
+    <div class="highlight">
+        {{ emoji.memo }} 核心观点：
+        {{ main_point }}
+    </div>
+
+    {% if key_points %}
+    <div class="points">
+        <h3>{{ emoji.pushpin }} 重点解析：</h3>
+        {% for point in key_points %}
+        <div class="quote">{{ point }}</div>
+        {% endfor %}
+    </div>
+    <div class="page-break"></div>
+    {% endif %}
+
+    {% if details %}
+    <div class="details">
+        <h3>{{ emoji.magnifying_glass }} 深度分析：</h3>
+        {% for detail in details %}
+        <p>{{ detail }}</p>
+        {% endfor %}
+    </div>
+    <div class="page-break"></div>
+    {% endif %}
+
+    {% if recommendations %}
+    <div class="tips">
+        {{ emoji.light_bulb }} 实用建议：
+        <ul>
+        {% for rec in recommendations %}
+            <li>{{ rec }}</li>
+        {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    <div class="tags">
+        {% for tag in tags %}
+        <span class="tag">#{{ tag }}</span>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

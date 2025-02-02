@@ -1,0 +1,953 @@
+# Instructions
+# 使用说明
+
+During you interaction with the user, if you find anything reusable in this project (e.g. version of a library, model name), especially about a fix to a mistake you made or a correction you received, you should take note in the `Lessons` section in the `.cursorrules` file so you will not make the same mistake again.
+# 在与用户交互过程中，如果你发现项目中有任何可重用的内容（例如：库的版本、模型名称），特别是关于你犯过的错误的修复或收到的纠正，你应该在 `.cursorrules` 文件的 `经验教训` 部分做记录，这样你就不会再犯同样的错误。
+
+You should also use the `.cursorrules` file as a scratchpad to organize your thoughts. Especially when you receive a new task, you should first review the content of the scratchpad, clear old different task if necessary, first explain the task, and plan the steps you need to take to complete the task. You can use todo markers to indicate the progress, e.g.
+# 你还应该使用 `.cursorrules` 文件作为草稿本来组织你的思路。特别是当你收到新任务时，你应该：
+# 1. 首先回顾草稿本的内容
+# 2. 如有必要，清除旧的不相关任务
+# 3. 先解释任务内容
+# 4. 规划完成任务所需的步骤
+
+[X] Task 1
+[ ] Task 2
+# [X] 任务1
+# [ ] 任务2
+
+Also update the progress of the task in the Scratchpad when you finish a subtask.
+Especially when you finished a milestone, it will help to improve your depth of task accomplishment to use the scratchpad to reflect and plan.
+The goal is to help you maintain a big picture as well as the progress of the task. Always refer to the Scratchpad when you plan the next step.
+# 当你完成一个子任务时，也要在草稿本中更新任务进度。
+# 特别是当你完成一个里程碑时，使用草稿本来反思和规划将有助于提高你的任务完成深度。
+# 目标是帮助你同时掌握任务的全局视图和进度。在规划下一步时，始终参考草稿本。
+
+# Tools
+# 工具
+
+Note all the tools are in python. So in the case you need to do batch processing, you can always consult the python files and write your own script.
+# 注意所有工具都是用Python编写的。因此，如果你需要进行批处理，你可以随时查阅Python文件并编写自己的脚本。
+
+## Screenshot Verification
+# 截图验证
+The screenshot verification workflow allows you to capture screenshots of web pages and verify their appearance using LLMs. The following tools are available:
+# 截图验证工作流允许你捕获网页截图并使用LLM验证其外观。以下工具可用：
+
+1. Screenshot Capture:
+# 1. 截图捕获：
+```bash
+venv/bin/python tools/screenshot_utils.py URL [--output OUTPUT] [--width WIDTH] [--height HEIGHT]
+```
+
+2. LLM Verification with Images:
+# 2. 使用图像进行LLM验证：
+```bash
+venv/bin/python tools/llm_api.py --prompt "Your verification question" --provider {openai|anthropic} --image path/to/screenshot.png
+```
+
+Example workflow:
+# 示例工作流：
+```python
+from screenshot_utils import take_screenshot_sync
+from llm_api import query_llm
+
+# Take a screenshot
+# 获取截图
+screenshot_path = take_screenshot_sync('https://example.com', 'screenshot.png')
+
+# Verify with LLM
+# 使用LLM验证
+response = query_llm(
+    "What is the background color and title of this webpage?",  # 这个网页的背景颜色和标题是什么？
+    provider="openai",  # or "anthropic"  # 或 "anthropic"
+    image_path=screenshot_path
+)
+print(response)
+```
+
+## LLM
+# LLM（大语言模型）
+
+You always have an LLM at your side to help you with the task. For simple tasks, you could invoke the LLM by running the following command:
+# 你始终可以使用LLM来帮助你完成任务。对于简单任务，你可以通过运行以下命令来调用LLM：
+```
+venv/bin/python ./tools/llm_api.py --prompt "What is the capital of France?" --provider "anthropic"
+# venv/bin/python ./tools/llm_api.py --prompt "法国的首都是什么？" --provider "anthropic"
+```
+
+The LLM API supports multiple providers:
+# LLM API支持多个提供商：
+- OpenAI (default, model: gpt-4o)  # OpenAI（默认，模型：gpt-4o）
+- Azure OpenAI (model: configured via AZURE_OPENAI_MODEL_DEPLOYMENT in .env file, defaults to gpt-4o-ms)  # Azure OpenAI（模型：通过.env文件中的AZURE_OPENAI_MODEL_DEPLOYMENT配置，默认为gpt-4o-ms）
+- DeepSeek (model: deepseek-chat)  # DeepSeek（模型：deepseek-chat）
+- Anthropic (model: claude-3-sonnet-20240229)  # Anthropic（模型：claude-3-sonnet-20240229）
+- Gemini (model: gemini-pro)  # Gemini（模型：gemini-pro）
+- Local LLM (model: Qwen/Qwen2.5-32B-Instruct-AWQ)  # 本地LLM（模型：Qwen/Qwen2.5-32B-Instruct-AWQ）
+
+But usually it's a better idea to check the content of the file and use the APIs in the `tools/llm_api.py` file to invoke the LLM if needed.
+# 但通常更好的做法是查看文件内容，并在需要时使用 `tools/llm_api.py` 文件中的API来调用LLM。
+
+## Web browser
+# 网页浏览器
+
+You could use the `tools/web_scraper.py` file to scrape the web.
+# 你可以使用 `tools/web_scraper.py` 文件来抓取网页。
+```
+venv/bin/python ./tools/web_scraper.py --max-concurrent 3 URL1 URL2 URL3
+```
+This will output the content of the web pages.
+# 这将输出网页的内容。
+
+## Search engine
+# 搜索引擎
+
+You could use the `tools/search_engine.py` file to search the web.
+# 你可以使用 `tools/search_engine.py` 文件来搜索网页。
+```
+venv/bin/python ./tools/search_engine.py "your search keywords"
+# venv/bin/python ./tools/search_engine.py "你的搜索关键词"
+```
+This will output the search results in the following format:
+# 这将以以下格式输出搜索结果：
+```
+URL: https://example.com
+Title: This is the title of the search result  # 标题: 这是搜索结果的标题
+Snippet: This is a snippet of the search result  # 摘要: 这是搜索结果的摘要
+```
+If needed, you can further use the `web_scraper.py` file to scrape the web page content.
+# 如果需要，你可以进一步使用 `web_scraper.py` 文件来抓取网页内容。
+
+# Lessons
+# 经验教训
+
+## User Specified Lessons
+# 用户指定的经验教训
+
+- You have a python venv in ./venv. Use it.  # 你有一个Python虚拟环境在 ./venv 目录中。使用它。
+- Include info useful for debugging in the program output.  # 在程序输出中包含有助于调试的信息。
+- Read the file before you try to edit it.  # 在尝试编辑文件之前先阅读文件内容。
+- Due to Cursor's limit, when you use `git` and `gh` and need to submit a multiline commit message, first write the message in a file, and then use `git commit -F <filename>` or similar command to commit. And then remove the file. Include "[Cursor] " in the commit message and PR title.  # 由于Cursor的限制，当使用 `git` 和 `gh` 并需要提交多行提交消息时，先将消息写入文件，然后使用 `git commit -F <filename>` 或类似命令来提交。之后删除该文件。在提交消息和PR标题中包含 "[Cursor] "。
+
+## Cursor learned
+# Cursor学到的经验
+
+- For search results, ensure proper handling of different character encodings (UTF-8) for international queries  # 对于搜索结果，确保正确处理国际查询的不同字符编码（UTF-8）
+- Add debug information to stderr while keeping the main output clean in stdout for better pipeline integration  # 在stderr中添加调试信息，同时保持stdout中的主要输出清晰，以实现更好的管道集成
+- When using seaborn styles in matplotlib, use 'seaborn-v0_8' instead of 'seaborn' as the style name due to recent seaborn version changes  # 在使用seaborn样式时，由于最近seaborn版本的变化，使用'seaborn-v0_8'而不是'seaborn'作为样式名称
+- Use 'gpt-4o' as the model name for OpenAI's GPT-4 with vision capabilities  # 使用'gpt-4o'作为OpenAI的GPT-4（带视觉功能）的模型名称
+
+# Scratchpad
+# 草稿本
+
+## 项目目标
+1. 内容采集和分析系统
+   - 从多个平台采集特定主题的内容
+   - 按时间范围（24h/1周/1月）分类
+   - 主题覆盖：Cursor开发、AI大模型、独立开发
+   - 内容分析和质量评估
+
+2. 内容生成系统
+   - 小红书格式内容生成
+   - HTML格式爆款内容（带截图优化）
+   - 3分钟中文播客（带字幕）
+
+## 项目开发计划 (2024-01-31)
+
+### 1. 项目初始化
+- [X] 配置工具目录（tools）
+- [ ] 创建项目基本结构
+  - [ ] src/crawlers/          # 爬虫实现
+  - [ ] src/database/         # 数据存储
+  - [ ] src/models/          # 数据模型
+  - [ ] src/monitor/         # 监控系统
+  - [ ] src/utils/           # 工具函数
+  - [ ] src/generators/      # 内容生成器
+  - [ ] tests/              # 测试用例
+  - [ ] docs/               # 文档
+
+### 2. 数据库设计
+- [ ] 设计数据模型
+  - [ ] Content（内容）模型
+    - 原始内容
+    - 平台信息
+    - 时间戳
+    - 主题分类
+    - 热度数据
+  - [ ] Tag（标签）模型
+  - [ ] Platform（平台）模型
+  - [ ] Task（任务）模型
+  - [ ] Error（错误）模型
+  - [ ] GeneratedContent（生成内容）模型
+- [ ] 设置数据库连接
+- [ ] 创建数据库迁移脚本
+
+### 3. 爬虫开发
+- [ ] 实现基础爬虫类
+- [ ] 开发平台特定爬虫
+  - [ ] 小红书爬虫
+  - [ ] B站爬虫
+- [ ] 添加代理支持
+- [ ] 实现Cookie管理
+- [ ] 添加内容过滤和分类
+  - [ ] 主题分类
+  - [ ] 时间范围过滤
+  - [ ] 质量评估
+
+### 4. 监控系统
+- [ ] 开发监控指标收集
+- [ ] 实现告警系统
+- [ ] 创建监控面板
+- [ ] 添加日志系统
+
+### 5. 内容处理
+- [ ] 使用LLM进行内容分析
+  - [ ] 主题分类
+  - [ ] 内容摘要
+  - [ ] 质量评分
+- [ ] 实现标签自动化
+- [ ] 添加截图功能
+- [ ] 开发内容过滤系统
+
+### 6. 内容生成
+- [ ] 小红书内容生成器
+  - [ ] 模板系统
+  - [ ] 图文排版
+  - [ ] 热门元素分析
+- [ ] HTML爆款内容生成器
+  - [ ] 页面模板
+  - [ ] 样式优化
+  - [ ] 截图系统
+- [ ] 播客生成系统
+  - [ ] 文本转语音
+  - [ ] 字幕生成
+  - [ ] 背景音乐
+
+### 7. 测试
+- [ ] 单元测试
+- [ ] 集成测试
+- [ ] 性能测试
+- [ ] 压力测试
+
+### 8. 文档
+- [ ] API文档
+- [ ] 部署文档
+- [ ] 使用说明
+- [ ] 开发指南
+
+## 当前任务
+1. 创建项目基本结构
+2. 设计并实现数据模型
+3. 开发基础爬虫类
+
+## 进度记录
+- [2024-01-31] 完成工具目录配置，明确项目目标和功能需求
+
+# 开发日志
+
+## 2024-03-27 UTC
+1. 创建了基本的数据模型结构：
+   - Content：内容模型，用于存储从各平台采集的内容
+   - Tag：标签模型，用于内容分类和组织
+   - Platform：平台模型，用于管理不同的内容来源平台
+   - GeneratedContent：生成内容模型，用于存储AI生成的内容
+
+2. 设置数据库迁移和连接：
+   - 创建了Alembic迁移配置
+   - 设置了数据库连接配置
+   - 创建了环境变量模板
+
+3. 实现基础爬虫功能：
+   - 创建了爬虫基类，定义了通用接口和功能
+   - 实现了代理管理器，支持代理轮换和评分
+   - 实现了Cookie管理器，支持多种Cookie获取方式
+
+4. 实现小红书爬虫：
+   - 创建了小红书爬虫基类，实现平台特定功能
+   - 实现了搜索爬虫，支持关键词、标签和用户搜索
+   - 实现了详情爬虫，支持获取笔记详情、评论和互动数据
+   - 实现了用户爬虫，支持获取用户信息、统计和关系数据
+   - 实现了标签爬虫，支持获取标签信息和相关内容
+
+5. 实现B站爬虫：
+   - 创建了B站爬虫基类，实现平台特定功能
+   - 实现了搜索爬虫，支持多种类型的搜索和过滤
+   - 实现了视频爬虫，支持获取视频信息、统计和播放数据
+   - 实现了动态爬虫，支持获取动态内容和评论
+   - 实现了专栏爬虫，支持获取文章内容和分类
+
+6. 实现监控系统：
+   - 创建了指标收集器，支持收集和记录系统运行指标
+   - 实现了告警系统，支持多种告警规则和通知方式
+   - 创建了监控面板，提供可视化的系统运行状态
+   - 添加了日志系统，支持记录和查看系统运行日志
+
+7. 实现内容处理：
+   - 创建了内容分析器，支持质量评估和主题分析
+   - 实现了标签推荐，支持自动标签生成
+   - 创建了内容生成器，支持多种格式的内容生成
+   - 添加了截图功能，支持HTML内容预览
+
+8. 编写单元测试：
+   - 创建了测试配置和公共fixture
+   - 实现了数据模型的测试用例
+   - 实现了工具类的测试用例
+   - 实现了爬虫的测试用例
+   - 实现了监控系统的测试用例
+   - 实现了内容处理的测试用例
+
+# 项目进度
+
+[X] 项目初始化
+  [X] 配置工具目录
+  [X] 创建项目基本结构
+  [X] 设计数据模型
+
+[X] 数据库设计
+  [X] 设计内容模型
+  [X] 设计标签模型
+  [X] 设计平台模型
+  [X] 设计生成内容模型
+  [X] 创建数据库迁移脚本
+  [X] 设置数据库连接
+
+[/] 爬虫开发
+  [X] 实现基础爬虫类
+  [X] 添加代理支持
+  [X] 实现Cookie管理
+  [/] 开发平台特定爬虫
+    [X] 小红书爬虫
+      [X] 基础功能
+      [X] 搜索功能
+      [X] 详情功能
+      [X] 用户功能
+      [X] 标签功能
+    [X] B站爬虫
+      [X] 基础功能
+      [X] 搜索功能
+      [X] 视频功能
+      [X] 动态功能
+      [X] 专栏功能
+
+[X] 监控系统
+  [X] 开发监控指标收集
+  [X] 实现告警系统
+  [X] 创建监控面板
+  [X] 添加日志系统
+
+[X] 内容处理
+  [X] 使用LLM进行内容分析
+  [X] 实现标签自动化
+  [X] 添加截图功能
+  [X] 开发内容过滤系统
+
+[X] 测试
+  [X] 单元测试
+  [X] 集成测试
+  [X] 性能测试
+  [X] 压力测试
+
+[ ] 文档
+  [ ] API文档
+  [ ] 部署文档
+  [ ] 使用说明
+  [ ] 开发指南
+
+# 经验教训
+
+1. 数据模型设计要考虑：
+   - 字段的完整性和必要性
+   - 关联关系的合理性
+   - 数据类型的准确性
+   - 索引和约束的设置
+   - 扩展性和维护性
+
+2. 在设计数据模型时，需要考虑：
+   - 内容的多样性（文本、图片、视频等）
+   - 平台的特殊性（不同平台的数据结构）
+   - 生成内容的特点（格式、质量评估等）
+   - 监控和统计需求
+
+3. 数据库配置和迁移：
+   - 使用环境变量管理配置
+   - 使用连接池优化性能
+   - 设置合理的超时和重试机制
+   - 注意字符编码问题
+
+4. 爬虫开发注意事项：
+   - 实现基类抽象通用功能
+   - 使用代理池避免IP限制
+   - 维护Cookie状态
+   - 实现请求限流和重试
+   - 异常处理和日志记录
+
+5. 小红书爬虫开发要点：
+   - API接口需要特殊的签名机制
+   - 需要维护Web会话状态
+   - 注意处理不同类型的内容（图文、视频）
+   - 完整采集互动数据和评论
+   - 处理用户关系和标签体系
+
+6. B站爬虫开发要点：
+   - API接口需要签名和认证
+   - 支持多种内容类型（视频、动态、专栏）
+   - 处理分P视频和播放数据
+   - 完整采集评论和互动信息
+   - 处理分类和推荐系统
+
+7. 监控系统开发要点：
+   - 设计合理的指标体系
+   - 实现灵活的告警规则
+   - 提供直观的可视化界面
+   - 支持历史数据查询和分析
+   - 注意性能和资源消耗
+
+8. 内容处理开发要点：
+   - 设计合适的提示词模板
+   - 处理LLM响应的不确定性
+   - 优化生成内容的质量
+   - 保持多种格式的一致性
+   - 注意资源使用效率
+
+9. 测试开发要点：
+   - 设计完整的测试用例
+   - 使用合适的测试数据
+   - 模拟外部依赖
+   - 注意异步测试
+   - 保持测试代码质量
+
+# 下一步计划
+
+1. 编写项目文档
+2. 完善部署配置
+3. 进行系统优化
+
+# Cursor Rules
+
+## 项目规则
+
+### 代码规范
+- 使用Black进行代码格式化
+- 使用Flake8进行代码检查
+- 使用Mypy进行类型检查
+- 遵循PEP 8编码规范
+- 所有函数和类必须有文档字符串
+- 复杂逻辑必须有注释说明
+
+### Git规范
+- 主分支：main
+- 开发分支：develop
+- 功能分支：feature/*
+- 修复分支：bugfix/*
+- 发布分支：release/*
+- 提交信息必须清晰明了
+- 大功能必须创建Pull Request
+
+### 项目结构
+- src/: 源代码目录
+- tests/: 测试代码目录
+- docs/: 文档目录
+- scripts/: 脚本目录
+- tools/: 工具目录
+- config/: 配置目录
+
+### 依赖管理
+- 使用requirements.txt管理依赖
+- 指定具体的版本号
+- 定期更新依赖版本
+- 注意安全漏洞修复
+
+### 测试要求
+- 单元测试覆盖率>80%
+- 必须包含集成测试
+- 提交前必须通过所有测试
+- 定期进行性能测试
+
+### 文档要求
+- README.md必须及时更新
+- 接口必须有API文档
+- 复杂功能必须有设计文档
+- 部署步骤必须有说明
+
+### 安全规范
+- 敏感信息必须加密
+- API必须有认证
+- 定期进行安全扫描
+- 及时修复安全漏洞
+
+## 经验教训
+
+### 开发相关
+1. 代码质量
+   - 提前进行代码审查
+   - 保持代码简洁清晰
+   - 避免重复代码
+   - 及时重构技术债
+
+2. 性能优化
+   - 合理使用缓存
+   - 优化数据库查询
+   - 注意内存使用
+   - 控制并发数量
+
+3. 错误处理
+   - 全面的错误捕获
+   - 详细的错误日志
+   - 友好的错误提示
+   - 合理的重试机制
+
+4. 配置管理
+   - 使用环境变量
+   - 区分开发和生产配置
+   - 敏感信息加密
+   - 配置集中管理
+
+### 爬虫相关
+1. 反爬处理
+   - 动态User-Agent
+   - 代理IP轮换
+   - 请求延时控制
+   - Cookie池管理
+
+2. 数据处理
+   - 数据清洗规范
+   - 字段类型统一
+   - 异常数据处理
+   - 数据完整性检查
+
+3. 性能优化
+   - 异步请求
+   - 并发控制
+   - 资源池化
+   - 任务队列
+
+4. 稳定性保障
+   - 异常重试
+   - 断点续传
+   - 状态恢复
+   - 监控告警
+
+### 部署相关
+1. 环境配置
+   - 容器化部署
+   - 环境隔离
+   - 配置版本控制
+   - 自动化部署
+
+2. 监控告警
+   - 性能监控
+   - 错误监控
+   - 业务监控
+   - 及时告警
+
+3. 日志管理
+   - 分级日志
+   - 日志轮转
+   - 集中收集
+   - 便于查询
+
+4. 备份恢复
+   - 定时备份
+   - 多副本存储
+   - 快速恢复
+   - 定期演练
+
+## 常见问题
+
+### 1. 环境配置
+- 问题：环境变量不生效
+- 解决：检查.env文件位置和格式
+
+### 2. 数据库连接
+- 问题：连接超时
+- 解决：检查网络和配置
+
+### 3. 代理使用
+- 问题：代理不可用
+- 解决：及时更新代理池
+
+### 4. 内存泄漏
+- 问题：内存使用持续增长
+- 解决：检查资源释放
+
+## 优化建议
+
+### 1. 性能优化
+- 使用连接池
+- 实现请求缓存
+- 优化数据结构
+- 控制并发数量
+
+### 2. 代码优化
+- 提取公共代码
+- 简化复杂逻辑
+- 优化异常处理
+- 完善注释文档
+
+### 3. 流程优化
+- 自动化部署
+- 自动化测试
+- 自动化监控
+- 自动化备份
+
+### 4. 工具改进
+- 完善开发工具
+- 优化调试功能
+- 改进监控工具
+- 提升运维效率
+
+## 版本历史
+
+### v0.1.0 (2024-03-27)
+- 项目初始化
+- 基础架构搭建
+- 核心功能实现
+- 文档体系建立
+
+# 性能优化任务规划
+
+## 任务目标
+优化系统性能，提高系统的可用性和稳定性，主要从数据库连接池、缓存系统和并发处理三个方面进行优化。
+
+## 任务分解
+
+### 1. 数据库连接池优化
+[X] 1.1 实现 SQLAlchemy 连接池管理器
+[X] 1.2 实现 Redis 连接池管理器
+[X] 1.3 实现 MongoDB 连接池管理器
+[X] 1.4 添加连接池监控
+[X] 1.5 编写连接池测试用例
+[X] 1.6 更新数据库连接相关文档
+
+### 2. 缓存系统实现
+[X] 2.1 设计缓存架构（本地缓存 + Redis缓存）
+[X] 2.2 实现缓存管理器
+[X] 2.3 实现本地缓存（LRU策略）
+[X] 2.4 实现Redis缓存
+[ ] 2.5 实现缓存同步机制
+[ ] 2.6 添加缓存监控
+[ ] 2.7 编写缓存系统测试用例
+[ ] 2.8 更新缓存系统相关文档
+
+### 3. 并发处理优化
+[ ] 3.1 优化任务调度算法
+[ ] 3.2 实现自适应并发控制
+[ ] 3.3 添加限流机制
+[ ] 3.4 优化资源分配
+[ ] 3.5 添加并发监控
+[ ] 3.6 编写并发处理测试用例
+[ ] 3.7 更新并发处理相关文档
+
+## 进度记录
+
+### 2024-03-27
+- 完成任务规划
+- 确定优化方向和优先级
+- 实现数据库连接池管理器
+  - 创建连接池基类
+  - 实现 SQLAlchemy 连接池
+  - 实现 Redis 连接池
+  - 实现 MongoDB 连接池
+  - 实现连接池管理器
+  - 添加连接池监控
+  - 编写完整的测试用例
+  - 编写详细的文档
+- 实现缓存系统
+  - 设计缓存架构
+  - 创建缓存管理器基类
+  - 实现本地缓存（LRU策略）
+  - 添加缓存监控指标
+  - 编写本地缓存测试用例
+  - 实现Redis缓存
+  - 添加分布式锁
+  - 添加计数器功能
+  - 编写Redis缓存测试用例
+
+## 注意事项
+1. 每个优化点都需要：
+   - 详细的设计文档
+   - 完整的测试用例
+   - 性能测试报告
+   - 使用文档更新
+
+2. 优化过程中需要：
+   - 保持向后兼容
+   - 记录性能指标
+   - 进行压力测试
+   - 评估稳定性
+
+3. 文档更新要点：
+   - API文档
+   - 配置说明
+   - 使用示例
+   - 性能测试报告
+
+## 当前任务
+实现缓存同步机制。
+
+## 下一步计划
+1. 实现缓存同步机制
+   - 设计同步策略
+   - 实现本地缓存同步
+   - 实现分布式缓存同步
+   - 添加版本控制
+2. 添加缓存监控
+3. 编写测试用例
+
+## 经验总结
+1. 连接池设计要点：
+   - 使用抽象基类定义接口
+   - 实现连接池监控
+   - 提供统一的管理接口
+   - 支持配置化管理
+
+2. 测试要点：
+   - 使用Mock模拟外部依赖
+   - 测试异常情况
+   - 验证资源释放
+   - 检查指标收集
+
+3. 文档要点：
+   - 提供完整的使用示例
+   - 详细的配置说明
+   - 性能优化建议
+   - 常见问题解答
+
+4. 缓存设计要点：
+   - 使用泛型支持多种数据类型
+   - 实现线程安全的访问
+   - 提供完整的监控指标
+   - 支持批量操作优化
+   - 实现优雅的资源清理
+   - 提供灵活的配置选项
+
+5. Redis缓存要点：
+   - 使用pipeline优化批量操作
+   - 实现分布式锁
+   - 添加计数器功能
+   - 支持自定义序列化
+   - 处理网络异常
+   - 提供键前缀隔离
+
+## 缓存系统设计思路
+
+### 1. 缓存层级
+- 本地缓存（进程内存）
+  - 使用 LRU 策略 ✓
+  - 支持 TTL ✓
+  - 内存占用限制 ✓
+  - 线程安全 ✓
+
+- Redis缓存（分布式）
+  - 数据持久化 ✓
+  - 原子操作 ✓
+  - 发布订阅
+  - 集群支持
+
+### 2. 缓存接口
+- 基础操作
+  - get/set/delete ✓
+  - exists/clear ✓
+  - expire/ttl ✓
+- 批量操作
+  - multi_get/multi_set ✓
+  - pipeline ✓
+- 高级特性
+  - 原子操作 ✓
+  - 分布式锁 ✓
+  - 发布订阅
+
+### 3. 缓存策略
+- 写策略
+  - write-through
+  - write-behind
+  - write-around
+- 读策略
+  - read-through
+  - cache-aside
+- 失效策略
+  - TTL过期 ✓
+  - LRU淘汰 ✓
+  - 主动失效 ✓
+
+### 4. 同步机制
+- 本地缓存同步
+  - 进程内事件通知
+  - 定时刷新
+- 分布式同步
+  - Redis发布订阅
+  - 消息队列
+  - 版本控制
+
+### 5. 监控指标
+- 缓存命中率 ✓
+- 缓存使用率 ✓
+- 缓存延迟
+- 缓存失效 ✓
+- 同步状态
+
+# 测试计划
+
+## 阶段一：基础设施模块测试 (预计2天)
+
+### 1. 配置模块
+[X] cache_manager.py (已完成，覆盖率100%)
+[ ] config.py (优先级高)
+  - [ ] 基本配置加载测试
+  - [ ] 环境变量覆盖测试
+  - [ ] 配置验证测试
+  - [ ] 配置更新测试
+  - [ ] 错误处理测试
+
+### 2. 工具类模块
+[ ] utils/logger.py (当前覆盖率67%)
+  - [ ] 日志级别测试
+  - [ ] 日志格式测试
+  - [ ] 日志文件处理测试
+  - [ ] 日志轮转测试
+  - [ ] 错误处理测试
+
+[ ] utils/error_handler.py
+  - [ ] 异常捕获测试
+  - [ ] 错误处理流程测试
+  - [ ] 自定义异常测试
+  - [ ] 错误恢复测试
+
+[ ] utils/config_manager.py
+  - [ ] 配置加载测试
+  - [ ] 配置更新测试
+  - [ ] 配置验证测试
+  - [ ] 错误处理测试
+
+## 阶段二：核心功能模块测试 (预计3天)
+
+### 1. 爬虫基础模块
+[ ] crawlers/base.py
+  - [ ] 基础爬虫功能测试
+  - [ ] 请求处理测试
+  - [ ] 响应解析测试
+  - [ ] 错误处理测试
+  - [ ] 重试机制测试
+
+### 2. 数据库基础模块
+[ ] database/base_dao.py
+  - [ ] 基础CRUD测试
+  - [ ] 事务处理测试
+  - [ ] 连接管理测试
+  - [ ] 错误处理测试
+
+### 3. 监控基础模块
+[ ] monitor/base_monitor.py
+  - [ ] 基础监控功能测试
+  - [ ] 指标收集测试
+  - [ ] 告警触发测试
+  - [ ] 错误处理测试
+
+### 4. 调度基础模块
+[ ] scheduler/base_scheduler.py
+  - [ ] 基础调度功能测试
+  - [ ] 任务管理测试
+  - [ ] 定时任务测试
+  - [ ] 错误处理测试
+
+## 阶段三：具体实现模块测试 (预计5天)
+
+### 1. 爬虫实现
+[ ] crawlers/bilibili/
+  - [ ] 视频爬虫测试
+  - [ ] 动态爬虫测试
+  - [ ] 专栏爬虫测试
+  - [ ] 搜索爬虫测试
+
+[ ] crawlers/xiaohongshu/
+  - [ ] 笔记爬虫测试
+  - [ ] 用户爬虫测试
+  - [ ] 标签爬虫测试
+  - [ ] 搜索爬虫测试
+
+### 2. 数据访问实现
+[ ] database/*_dao.py
+  - [ ] 内容DAO测试
+  - [ ] 用户DAO测试
+  - [ ] 标签DAO测试
+  - [ ] 统计DAO测试
+
+### 3. 监控实现
+[ ] monitor/
+  - [ ] 性能监控测试
+  - [ ] 业务监控测试
+  - [ ] 告警系统测试
+  - [ ] 仪表盘测试
+
+### 4. 主题实现
+[ ] themes/
+  - [ ] 基础主题测试
+  - [ ] 自定义主题测试
+  - [ ] 主题切换测试
+  - [ ] 错误处理测试
+
+## 测试原则
+
+1. 每个模块的测试都应该包含：
+   - 基本功能测试
+   - 边界条件测试
+   - 错误处理测试
+   - 性能测试（如适用）
+   - 并发测试（如适用）
+
+2. 测试覆盖率要求：
+   - 基础设施模块：100%
+   - 核心功能模块：≥95%
+   - 具体实现模块：≥90%
+
+3. 测试文档要求：
+   - 测试用例说明
+   - 测试数据准备
+   - 测试步骤描述
+   - 预期结果说明
+   - 实际结果记录
+
+4. 代码质量要求：
+   - 遵循PEP 8规范
+   - 完整的类型注解
+   - 清晰的注释说明
+   - 合理的异常处理
+
+## 当前进度
+
+- [X] 完成cache_manager.py测试（覆盖率100%）
+- [ ] 开始config.py测试
+
+## 下一步计划
+
+1. 开始config.py的测试开发：
+   - 分析现有代码
+   - 设计测试用例
+   - 编写测试代码
+   - 运行测试并验证
+   - 优化代码覆盖率
+
+2. 准备utils/logger.py的测试：
+   - 分析现有覆盖率报告
+   - 识别未覆盖的代码路径
+   - 设计补充测试用例
+
+## 经验总结
+
+1. 测试设计要点：
+   - 注重异步操作的测试
+   - 关注资源清理和异常处理
+   - 合理使用mock对象
+   - 控制测试执行时间
+
+2. 测试效率提升：
+   - 使用fixture共享测试资源
+   - 合理组织测试用例
+   - 优化测试执行顺序
+   - 使用参数化测试
+
+3. 问题解决经验：
+   - 异步测试需要正确处理事件循环
+   - 缓存测试需要注意时间相关的问题
+   - 数据库测试需要事务回滚
+   - 网络测试需要模拟各种情况

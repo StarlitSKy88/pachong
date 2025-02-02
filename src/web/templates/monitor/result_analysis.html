@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>结果统计</title>
+    <style>
+        .result-analysis { padding: 20px; }
+        .platform-stats { margin-bottom: 20px; padding: 15px; border: 1px solid #ddd; }
+        .platform-stats h4 { margin-top: 0; }
+        .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    </style>
+</head>
+<body>
+    <div class="result-analysis">
+        <h3>爬取结果统计</h3>
+        {% for platform in platforms %}
+        <div class="platform-stats">
+            <h4>{{ platform }}</h4>
+            <div class="stats-grid">
+                <div>成功数: {{ stats[platform].success }}</div>
+                <div>失败数: {{ stats[platform].failed }}</div>
+                <div>成功率: {{ stats[platform].success_rate }}%</div>
+                <div>平均耗时: {{ stats[platform].avg_time }}s</div>
+                <div>内容数量: {{ stats[platform].content_count }}</div>
+                <div>更新时间: {{ stats[platform].last_update }}</div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</body>
+</html> 
