@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>内容采集系统</title>
+    <link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css">
+    <script src="https://unpkg.com/vue@3"></script>
+    <script src="https://unpkg.com/element-plus"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <style>
+        .container {
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .search-history {
+            margin: 20px 0;
+        }
+        .result-preview {
+            margin-top: 20px;
+        }
+        .settings-form {
+            margin-top: 20px;
+        }
+        .platform-tag {
+            margin-right: 10px;
+        }
+        .task-card {
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <el-container>
+            <el-header>
+                <el-menu mode="horizontal" :router="true">
+                    <el-menu-item index="1">任务管理</el-menu-item>
+                    <el-menu-item index="2">历史记录</el-menu-item>
+                    <el-menu-item index="3">系统设置</el-menu-item>
+                </el-menu>
+            </el-header>
+            
+            <el-main>
+                <div class="container">
+                    <!-- 搜索区域 -->
+                    <el-card>
+                        <template #header>
+                            <div class="card-header">
+                                <span>内容采集</span>
+                                <el-button style="float: right" type="primary" @click="startTask" :loading="isTaskRunning">
+                                    {{ isTaskRunning ? '采集中...' : '开始采集' }}
+                                </el-button>
+                            </div>
+                        </template>
+                        
+                        <el-form :model="searchForm" label-width="100px">
+                            <el-form-item label="关键词">
+                                <el-input
+                                    v-model="searchForm.keywords"
+                                    type="textarea"
+                                    :rows="3"
+                                    placeholder="请输入搜索关键词，每行一个"
+                                ></el-input>
+                            </el-form-item>
+                            
+                            <el-form-item label="平台选择">
+                                <el-checkbox-group v-model="searchForm.platforms">
+                                    <el-checkbox label="xhs">小红书</el-checkbox>
+                                    <el-checkbox label="bilibili">B站</el-checkbox>
+                                    <el-checkbox label="weibo">微博</el-checkbox>
+                                    <el-checkbox label="zhihu">知乎</el-checkbox>
+                                </el-checkbox-group>
+                            </el-form-item>
+                            
+                            <el-form-item label="时间范围">
+                                <el-select v-model="searchForm.timeRange">
+                                    <el-option label="24小时内" value="24h"></el-option>
+                                    <el-option label="3天内" value="72h"></el-option>
+                                    <el-option label="7天内" value="168h"></el-option>
+                                    <el-option label="30天内" value="720h"></el-option>
+                                </el-select>
+                            </el-form-item>
+                            
+                            <el-form-item label="数量限制">
+                                <el-input-number v-model="searchForm.limit" :min="1" :max="1000"></el-input-number>
+                            </el-form-item>
+                        </el-form>
+                    </el-card>
+                    
+                    <!-- 进度展示 -->
+                    <el-card v-if="isTaskRunning" style="margin-top: 20px;">
+                        <template #header>
+                            <div class="card-header">
+                                <span>采集进度</span>
+                            </div>
+                        </template>
+                        
+                        <div v-for="(progress, platform) in taskProgress" :key="platform" style="margin-bottom: 15px;">
+                            <div style="margin-bottom: 5px;">
+                                <span>{{ getPlatformName(platform) }}: {{ progress.current }}/{{ progress.total }}</span>
+                                <span v-if="progress.speed" style="margin-left: 10px">
+                                    ({{ progress.speed }}条/秒)
+                                </span>
+                                <span v-if="progress.estimated_time" style="float: right">
+                                    预计剩余: {{ formatTime(progress.estimated_time) }}
+                                </span>
+                            </div>
+                            <el-progress 
+                                :percentage="Math.round((progress.current / progress.total) * 100)"
+                                :status="progress.status"
+                            ></el-progress>
+                        </div>
+                    </el-card>
+                    
+                    <!-- 结果预览 -->
+                    <el-card class="result-preview" v-if="searchResults.length > 0">
+                        <template #header>
+                            <div class="card-header">
+                                <span>采集结果</span>
+                                <div style="float: right">
+                                    <el-button type="primary" @click="downloadResults">下载结果</el-button>
+                                    <el-select v-model="resultFilter.platform" placeholder="平台筛选" style="margin-right: 10px;">
+                                        <el-option label="全部" value=""></el-option>
+                                        <el-option label="小红书" value="xhs"></el-option>
+                                        <el-option label="B站" value="bilibili"></el-option>
+                                        <el-option label="微博" value="weibo"></el-option>
+                                        <el-option label="知乎" value="zhihu"></el-option>
+                                    </el-select>
+                                </div>
+                            </div>
+                        </template>
+                        
+                        <el-table :data="filteredResults" style="width: 100%">
+                            <el-table-column prop="platform" label="平台" width="100">
+                                <template #default="scope">
+                                    <el-tag :type="getPlatformType(scope.row.platform)">
+                                        {{ scope.row.platform }}
+                                    </el-tag>
+                                </template>
+                            </el-table-column>
+                            <el-table-column prop="title" label="标题"></el-table-column>
+                            <el-table-column prop="author" label="作者" width="120"></el-table-column>
+                            <el-table-column prop="publish_time" label="发布时间" width="180"></el-table-column>
+                            <el-table-column label="操作" width="120">
+                                <template #default="scope">
+                                    <el-button type="text" @click="openUrl(scope.row.url)">查看原文</el-button>
+                                </template>
+                            </el-table-column>
+                        </el-table>
+                        
+                        <div style="margin-top: 20px; text-align: center;">
+                            <el-pagination
+                                v-model:current-page="currentPage"
+                                v-model:page-size="pageSize"
+                                :total="totalResults"
+                                :page-sizes="[10, 20, 50, 100]"
+                                layout="total, sizes, prev, pager, next"
+                            ></el-pagination>
+                        </div>
+                    </el-card>
+                    
+                    <!-- 历史记录 -->
+                    <el-card class="search-history" v-if="activeTab === 2">
+                        <template #header>
+                            <div class="card-header">
+                                <span>历史记录</span>
+                            </div>
+                        </template>
+                        
+                        <el-timeline>
+                            <el-timeline-item
+                                v-for="task in searchHistory"
+                                :key="task.id"
+                                :timestamp="task.start_time"
+                                placement="top"
+                            >
+                                <el-card class="task-card">
+                                    <h4>关键词: {{ task.keywords.join(', ') }}</h4>
+                                    <p>平台: {{ task.platforms.join(', ') }}</p>
+                                    <p>采集数量: {{ task.total_count }}</p>
+                                    <el-button type="text" @click="loadHistoryResults(task.id)">查看结果</el-button>
+                                    <el-button type="text" @click="downloadHistoryResults(task.id)">下载结果</el-button>
+                                </el-card>
+                            </el-timeline-item>
+                        </el-timeline>
+                    </el-card>
+                    
+                    <!-- 系统设置 -->
+                    <el-card class="settings-form" v-if="activeTab === 3">
+                        <template #header>
+                            <div class="card-header">
+                                <span>系统设置</span>
+                                <el-button style="float: right" type="primary" @click="saveSettings">
+                                    保存设置
+                                </el-button>
+                            </div>
+                        </template>
+                        
+                        <el-form :model="settings" label-width="150px">
+                            <el-form-item label="并发任务数">
+                                <el-input-number v-model="settings.maxConcurrent" :min="1" :max="10"></el-input-number>
+                            </el-form-item>
+                            
+                            <el-form-item label="请求间隔(秒)">
+                                <el-input-number v-model="settings.requestInterval" :min="1" :max="60"></el-input-number>
+                            </el-form-item>
+                            
+                            <el-form-item label="自动重试次数">
+                                <el-input-number v-model="settings.maxRetries" :min="0" :max="5"></el-input-number>
+                            </el-form-item>
+                            
+                            <el-form-item label="超时时间(秒)">
+                                <el-input-number v-model="settings.timeout" :min="5" :max="60"></el-input-number>
+                            </el-form-item>
+                            
+                            <el-form-item label="代理设置">
+                                <el-input v-model="settings.proxy" placeholder="http://proxy:port"></el-input>
+                            </el-form-item>
+                            
+                            <el-form-item label="导出格式">
+                                <el-radio-group v-model="settings.exportFormat">
+                                    <el-radio label="csv">CSV</el-radio>
+                                    <el-radio label="excel">Excel</el-radio>
+                                    <el-radio label="json">JSON</el-radio>
+                                </el-radio-group>
+                            </el-form-item>
+                            
+                            <el-form-item label="自动保存">
+                                <el-switch v-model="settings.autoSave"></el-switch>
+                            </el-form-item>
+                        </el-form>
+                    </el-card>
+                </div>
+            </el-main>
+        </el-container>
+    </div>
+    
+    <script>
+        const { createApp, ref, computed, onMounted } = Vue
+        
+        const app = createApp({
+            setup() {
+                const activeTab = ref(1)
+                const isTaskRunning = ref(false)
+                const currentPage = ref(1)
+                const pageSize = ref(20)
+                
+                // 搜索表单
+                const searchForm = ref({
+                    keywords: '',
+                    platforms: ['xhs', 'bilibili'],
+                    timeRange: '24h',
+                    limit: 100
+                })
+                
+                // 任务进度
+                const taskProgress = ref({
+                    xhs: { current: 0, total: 0, status: 'exception' },
+                    bilibili: { current: 0, total: 0, status: 'exception' },
+                    weibo: { current: 0, total: 0, status: 'exception' },
+                    zhihu: { current: 0, total: 0, status: 'exception' }
+                })
+                
+                // 结果过滤
+                const resultFilter = ref({
+                    platform: ''
+                })
+                
+                // 搜索结果
+                const searchResults = ref([])
+                const searchHistory = ref([])
+                
+                // 系统设置
+                const settings = ref({
+                    maxConcurrent: 3,
+                    requestInterval: 2,
+                    maxRetries: 3,
+                    timeout: 30,
+                    proxy: '',
+                    exportFormat: 'excel',
+                    autoSave: true
+                })
+                
+                // 计算属性
+                const filteredResults = computed(() => {
+                    if (!resultFilter.value.platform) {
+                        return searchResults.value
+                    }
+                    return searchResults.value.filter(
+                        item => item.platform === resultFilter.value.platform
+                    )
+                })
+                
+                const totalResults = computed(() => filteredResults.value.length)
+                
+                // 方法
+                const startTask = async () => {
+                    try {
+                        isTaskRunning.value = true
+                        const keywords = searchForm.value.keywords
+                            .split('\n')
+                            .map(k => k.trim())
+                            .filter(k => k)
+                        
+                        // 重置进度
+                        searchForm.value.platforms.forEach(platform => {
+                            taskProgress.value[platform] = {
+                                current: 0,
+                                total: searchForm.value.limit,
+                                status: 'active'
+                            }
+                        })
+                        
+                        // 发送任务请求
+                        const response = await axios.post('http://localhost:8000/api/crawler/task', {
+                            keywords: keywords,
+                            platforms: searchForm.value.platforms,
+                            time_range: searchForm.value.timeRange,
+                            limit: searchForm.value.limit
+                        })
+                        
+                        const taskId = response.data.task_id
+                        
+                        // 开始轮询进度
+                        const progressInterval = setInterval(async () => {
+                            const progressResponse = await axios.get(`http://localhost:8000/api/crawler/progress/${taskId}`)
+                            const progress = progressResponse.data
+                            
+                            // 更新进度
+                            Object.keys(progress).forEach(platform => {
+                                if (taskProgress.value[platform]) {
+                                    taskProgress.value[platform] = {
+                                        ...progress[platform],  // 包含所有进度信息
+                                        status: progress[platform].status
+                                    }
+                                }
+                            })
+                            
+                            // 检查是否完成
+                            const isCompleted = Object.values(progress).every(
+                                p => p.status === 'success' || p.status === 'exception'
+                            )
+                            
+                            if (isCompleted) {
+                                clearInterval(progressInterval)
+                                isTaskRunning.value = false
+                                
+                                // 加载结果
+                                const resultsResponse = await axios.get(`http://localhost:8000/api/crawler/results/${taskId}`)
+                                searchResults.value = resultsResponse.data
+                                
+                                ElMessage.success('采集任务完成')
+                            }
+                        }, 1000)
+                        
+                    } catch (error) {
+                        console.error('任务启动失败:', error)
+                        ElMessage.error('任务启动失败')
+                        isTaskRunning.value = false
+                    }
+                }
+                
+                const loadHistoryResults = async (taskId) => {
+                    try {
+                        const response = await axios.get(`http://localhost:8000/api/crawler/results/${taskId}`)
+                        searchResults.value = response.data
+                        activeTab.value = 1  // 切换到结果页面
+                    } catch (error) {
+                        console.error('加载历史结果失败:', error)
+                        ElMessage.error('加载历史结果失败')
+                    }
+                }
+                
+                const downloadResults = async () => {
+                    try {
+                        const format = settings.value.exportFormat
+                        const response = await axios.get('http://localhost:8000/api/crawler/export', {
+                            params: { format },
+                            responseType: 'blob'
+                        })
+                        
+                        const url = window.URL.createObjectURL(new Blob([response.data]))
+                        const link = document.createElement('a')
+                        link.href = url
+                        link.setAttribute('download', `results.${format}`)
+                        document.body.appendChild(link)
+                        link.click()
+                        document.body.removeChild(link)
+                        
+                        ElMessage.success('下载成功')
+                    } catch (error) {
+                        console.error('下载失败:', error)
+                        ElMessage.error('下载失败')
+                    }
+                }
+                
+                const downloadHistoryResults = async (taskId) => {
+                    try {
+                        const format = settings.value.exportFormat
+                        const response = await axios.get(`http://localhost:8000/api/crawler/export/${taskId}`, {
+                            params: { format },
+                            responseType: 'blob'
+                        })
+                        
+                        const url = window.URL.createObjectURL(new Blob([response.data]))
+                        const link = document.createElement('a')
+                        link.href = url
+                        link.setAttribute('download', `results_${taskId}.${format}`)
+                        document.body.appendChild(link)
+                        link.click()
+                        document.body.removeChild(link)
+                        
+                        ElMessage.success('下载成功')
+                    } catch (error) {
+                        console.error('下载失败:', error)
+                        ElMessage.error('下载失败')
+                    }
+                }
+                
+                const saveSettings = async () => {
+                    try {
+                        await axios.post('http://localhost:8000/api/crawler/settings', settings.value)
+                        ElMessage.success('设置保存成功')
+                    } catch (error) {
+                        console.error('设置保存失败:', error)
+                        ElMessage.error('设置保存失败')
+                    }
+                }
+                
+                const openUrl = (url) => {
+                    window.open(url, '_blank')
+                }
+                
+                const getPlatformType = (platform) => {
+                    const types = {
+                        xhs: 'danger',
+                        bilibili: 'primary',
+                        weibo: 'warning',
+                        zhihu: 'info'
+                    }
+                    return types[platform] || 'default'
+                }
+                
+                const getPlatformName = (platform) => {
+                    const names = {
+                        xhs: '小红书',
+                        bilibili: 'B站',
+                        weibo: '微博',
+                        zhihu: '知乎'
+                    }
+                    return names[platform] || platform
+                }
+                
+                const formatTime = (seconds) => {
+                    if (seconds < 60) {
+                        return `${seconds}秒`
+                    } else if (seconds < 3600) {
+                        const minutes = Math.floor(seconds / 60)
+                        const remainingSeconds = seconds % 60
+                        return `${minutes}分${remainingSeconds}秒`
+                    } else {
+                        const hours = Math.floor(seconds / 3600)
+                        const minutes = Math.floor((seconds % 3600) / 60)
+                        return `${hours}小时${minutes}分`
+                    }
+                }
+                
+                // 初始化
+                onMounted(async () => {
+                    try {
+                        // 加载历史记录
+                        const historyResponse = await axios.get('http://localhost:8000/api/crawler/history')
+                        searchHistory.value = historyResponse.data
+                        
+                        // 加载设置
+                        const settingsResponse = await axios.get('http://localhost:8000/api/crawler/settings')
+                        settings.value = settingsResponse.data
+                    } catch (error) {
+                        console.error('初始化失败:', error)
+                        ElMessage.error('初始化失败')
+                    }
+                })
+                
+                return {
+                    activeTab,
+                    searchForm,
+                    isTaskRunning,
+                    taskProgress,
+                    searchResults,
+                    filteredResults,
+                    resultFilter,
+                    currentPage,
+                    pageSize,
+                    totalResults,
+                    searchHistory,
+                    settings,
+                    startTask,
+                    loadHistoryResults,
+                    downloadResults,
+                    downloadHistoryResults,
+                    saveSettings,
+                    openUrl,
+                    getPlatformType,
+                    getPlatformName,
+                    formatTime
+                }
+            }
+        })
+        
+        app.use(ElementPlus)
+        app.mount('#app')
+    </script>
+</body>
+</html> 

@@ -4,25 +4,118 @@ import os
 import aiohttp
 from datetime import datetime, timedelta
 import logging
+import random
 
 logger = logging.getLogger(__name__)
 
 class CookieManager:
     """Cookie管理器"""
 
-    def __init__(self, platform_name: str = None):
-        """初始化Cookie管理器
-        
-        Args:
-            platform_name: 平台名称
-        """
-        self.platform_name = platform_name
+    def __init__(self):
         self.cookies = {}
-        self.expiry_times = {}
-        self.cookie_file = os.path.join(os.path.dirname(__file__), '..', 'data', 'cookies.json')
-        if platform_name:
-            self.cookie_file = os.path.join(os.path.dirname(__file__), '..', 'data', f'cookies_{platform_name}.json')
-        self._load_cookies()
+        self.cookie_file = "data/cookies.json"
+        self.load_cookies()
+
+    def load_cookies(self):
+        """从文件加载Cookie"""
+        try:
+            if os.path.exists(self.cookie_file):
+                with open(self.cookie_file, 'r') as f:
+                    self.cookies = json.load(f)
+        except Exception as e:
+            print(f"加载Cookie失败: {str(e)}")
+
+    def save_cookies(self):
+        """保存Cookie到文件"""
+        try:
+            os.makedirs(os.path.dirname(self.cookie_file), exist_ok=True)
+            with open(self.cookie_file, 'w') as f:
+                json.dump(self.cookies, f)
+        except Exception as e:
+            print(f"保存Cookie失败: {str(e)}")
+
+    def add_cookie(self, platform: str, cookie: str):
+        """添加Cookie"""
+        if platform not in self.cookies:
+            self.cookies[platform] = []
+        if cookie not in self.cookies[platform]:
+            self.cookies[platform].append(cookie)
+            self.save_cookies()
+
+    def get_cookie(self, platform: str) -> Optional[str]:
+        """获取随机Cookie"""
+        if platform in self.cookies and self.cookies[platform]:
+            return random.choice(self.cookies[platform])
+        return None
+
+    def remove_cookie(self, platform: str, cookie: str):
+        """移除Cookie"""
+        if platform in self.cookies and cookie in self.cookies[platform]:
+            self.cookies[platform].remove(cookie)
+            self.save_cookies()
+
+    def format_cookie(self, cookie_dict: Dict) -> str:
+        """格式化Cookie字典为字符串"""
+        return '; '.join([f"{k}={v}" for k, v in cookie_dict.items()])
+
+    def parse_cookie(self, cookie_str: str) -> Dict:
+        """解析Cookie字符串为字典"""
+        cookie_dict = {}
+        for item in cookie_str.split(';'):
+            if '=' in item:
+                key, value = item.strip().split('=', 1)
+                cookie_dict[key] = value
+        return cookie_dict
+
+    # 小红书Cookie
+    XHS_COOKIES = [
+        {
+            "webId": "your_web_id",
+            "webVersion": "your_web_version",
+            "a1": "your_a1",
+            "gid": "your_gid",
+            "timestamp": "your_timestamp"
+        }
+    ]
+
+    # B站Cookie
+    BILIBILI_COOKIES = [
+        {
+            "SESSDATA": "your_sessdata",
+            "bili_jct": "your_bili_jct",
+            "DedeUserID": "your_dedeuserid"
+        }
+    ]
+
+    def init_platform_cookies(self):
+        """初始化平台Cookie"""
+        # 添加小红书Cookie
+        for cookie in self.XHS_COOKIES:
+            self.add_cookie('xhs', self.format_cookie(cookie))
+        
+        # 添加B站Cookie
+        for cookie in self.BILIBILI_COOKIES:
+            self.add_cookie('bilibili', self.format_cookie(cookie))
+
+    async def update_cookies(self):
+        """更新Cookie池"""
+        # 这里可以添加从Cookie池服务获取Cookie的逻辑
+        self.init_platform_cookies()
+
+    async def check_cookie(self, platform: str, cookie: str) -> bool:
+        """检查Cookie是否有效"""
+        # 这里需要实现具体的Cookie检查逻辑
+        return True
+
+    async def check_all_cookies(self):
+        """检查所有Cookie"""
+        for platform in self.cookies:
+            valid_cookies = []
+            for cookie in self.cookies[platform]:
+                if await self.check_cookie(platform, cookie):
+                    valid_cookies.append(cookie)
+            self.cookies[platform] = valid_cookies
+        self.save_cookies()
 
     def _load_cookies(self):
         """从文件加载Cookie"""

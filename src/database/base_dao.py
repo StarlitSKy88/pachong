@@ -1,204 +1,220 @@
-"""基础DAO类"""
+"""数据访问层基类模块。"""
 
-from typing import List, Dict, Any, Optional, Type, TypeVar, Generic
+from typing import Any, Dict, Generic, List, Optional, Type, TypeVar, Union
+
+from fastapi.encoders import jsonable_encoder
+from pydantic import BaseModel
+from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
-from sqlalchemy import select, update, delete
-from contextlib import contextmanager, asynccontextmanager
 
-from src.models.base import Base
+from src.database.base import Base
+from src.utils.error_handler import DatabaseError
+from src.utils.logger import get_logger
 
-T = TypeVar('T', bound=Base)
+logger = get_logger(__name__)
 
-class BaseDAO(Generic[T]):
-    """基础DAO类"""
-    
-    def __init__(self, model: Type[T]):
-        """初始化
-        
+ModelType = TypeVar("ModelType", bound=Base)
+CreateSchemaType = TypeVar("CreateSchemaType", bound=BaseModel)
+UpdateSchemaType = TypeVar("UpdateSchemaType", bound=BaseModel)
+
+
+class BaseDAO(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
+    """数据访问基类。"""
+
+    def __init__(self, model: Type[ModelType]):
+        """初始化。
+
         Args:
             model: 模型类
         """
         self.model = model
-    
-    @asynccontextmanager
-    async def get_session(self) -> Session:
-        """获取数据库会话"""
-        async with get_db() as session:
-            yield session
-    
-    @asynccontextmanager
-    async def transaction(self):
-        """事务上下文管理器"""
-        async with self.get_session() as session:
-            try:
-                yield session
-                await session.commit()
-            except:
-                await session.rollback()
-                raise
-        
-    async def add(self, data: Dict[str, Any]) -> T:
-        """添加记录
-        
-        Args:
-            data: 记录数据
-            
-        Returns:
-            T: 记录对象
-        """
-        async with self.transaction() as session:
-            instance = self.model(**data)
-            session.add(instance)
-            await session.refresh(instance)
-            return instance
-        
-    def get(self, session: Session, id: int) -> Optional[T]:
-        """获取记录
-        
-        Args:
-            session: 数据库会话
-            id: 记录ID
-            
-        Returns:
-            Optional[T]: 记录对象
-        """
-        return session.get(self.model, id)
-        
-    async def get_by_field(self, field: str, value: Any) -> Optional[T]:
-        """根据字段获取记录
-        
-        Args:
-            field: 字段名
-            value: 字段值
-            
-        Returns:
-            Optional[T]: 记录对象
-        """
-        async with self.get_session() as session:
-            return await session.query(self.model).filter_by(**{field: value}).first()
-        
-    async def list(self, **filters) -> List[T]:
-        """获取记录列表
-        
-        Args:
-            **filters: 过滤条件
-            
-        Returns:
-            List[T]: 记录列表
-        """
-        async with self.get_session() as session:
-            query = session.query(self.model)
-            for key, value in filters.items():
-                if hasattr(self.model, key):
-                    query = query.filter(getattr(self.model, key) == value)
-            return await query.all()
-        
-    def update(self, session: Session, id: int, **kwargs) -> Optional[T]:
-        """更新记录
-        
-        Args:
-            session: 数据库会话
-            id: 记录ID
-            **kwargs: 要更新的字段值
-            
-        Returns:
-            Optional[T]: 更新后的记录
-        """
-        stmt = update(self.model).where(self.model.id == id).values(**kwargs)
-        session.execute(stmt)
-        session.commit()
-        return self.get(session, id)
-        
-    def delete(self, session: Session, id: int) -> bool:
-        """删除记录
-        
-        Args:
-            session: 数据库会话
-            id: 记录ID
-            
-        Returns:
-            bool: 是否删除成功
-        """
-        stmt = delete(self.model).where(self.model.id == id)
-        result = session.execute(stmt)
-        session.commit()
-        return result.rowcount > 0
-    
-    def get_all(self, session: Session) -> List[T]:
-        """获取所有记录
-        
-        Args:
-            session: 数据库会话
-            
-        Returns:
-            List[T]: 记录列表
-        """
-        stmt = select(self.model)
-        return list(session.scalars(stmt))
-    
-    async def count(self) -> int:
-        """获取记录总数"""
-        async with self.get_session() as session:
-            return await session.query(self.model).count()
-    
-    async def exists(self, **kwargs) -> bool:
-        """检查记录是否存在"""
-        async with self.get_session() as session:
-            return await session.query(self.model)\
-                .filter_by(**kwargs)\
-                .first() is not None
-    
-    async def get_by_fields(self, **kwargs) -> Optional[T]:
-        """根据多个字段获取记录"""
-        async with self.get_session() as session:
-            return await session.query(self.model)\
-                .filter_by(**kwargs)\
-                .first()
-    
-    async def find_by_field(self, field: str, value: Any, page: int = 1, per_page: int = 20) -> List[T]:
-        """根据字段查找记录"""
-        async with self.get_session() as session:
-            return await session.query(self.model)\
-                .filter(getattr(self.model, field) == value)\
-                .offset((page - 1) * per_page)\
-                .limit(per_page)\
-                .all()
-    
-    async def find_by_fields(self, page: int = 1, per_page: int = 20, **kwargs) -> List[T]:
-        """根据多个字段查找记录"""
-        async with self.get_session() as session:
-            return await session.query(self.model)\
-                .filter_by(**kwargs)\
-                .offset((page - 1) * per_page)\
-                .limit(per_page)\
-                .all()
 
-    def create(self, session: Session, **kwargs) -> T:
-        """创建记录
+    def get(self, db: Session, id: Any) -> Optional[ModelType]:
+        """获取单个对象。
 
         Args:
-            session: 数据库会话
-            **kwargs: 字段值
+            db: 数据库会话
+            id: 对象ID
 
         Returns:
-            T: 创建的记录
-        """
-        obj = self.model(**kwargs)
-        session.add(obj)
-        session.commit()
-        return obj
+            Optional[ModelType]: 查询结果
 
-    def delete(self, session: Session, id: int) -> bool:
-        """删除记录
+        Raises:
+            DatabaseError: 数据库错误
+        """
+        try:
+            return db.query(self.model).filter(self.model.id == id).first()
+        except SQLAlchemyError as e:
+            logger.error(f"Failed to get {self.model.__name__} by id {id}: {e}")
+            raise DatabaseError(f"Failed to get {self.model.__name__}") from e
+
+    def get_multi(
+        self,
+        db: Session,
+        *,
+        skip: int = 0,
+        limit: int = 100,
+        filters: Optional[Dict[str, Any]] = None,
+    ) -> List[ModelType]:
+        """获取多个对象。
 
         Args:
-            session: 数据库会话
-            id: 记录ID
+            db: 数据库会话
+            skip: 跳过数量
+            limit: 限制数量
+            filters: 过滤条件
 
         Returns:
-            bool: 是否删除成功
+            List[ModelType]: 查询结果列表
+
+        Raises:
+            DatabaseError: 数据库错误
         """
-        stmt = delete(self.model).where(self.model.id == id)
-        result = session.execute(stmt)
-        session.commit()
-        return result.rowcount > 0 
+        try:
+            query = db.query(self.model)
+            if filters:
+                for key, value in filters.items():
+                    if hasattr(self.model, key):
+                        query = query.filter(getattr(self.model, key) == value)
+            return query.offset(skip).limit(limit).all()
+        except SQLAlchemyError as e:
+            logger.error(f"Failed to get multiple {self.model.__name__}: {e}")
+            raise DatabaseError(f"Failed to get {self.model.__name__} list") from e
+
+    def create(self, db: Session, *, obj_in: CreateSchemaType) -> ModelType:
+        """创建对象。
+
+        Args:
+            db: 数据库会话
+            obj_in: 创建对象数据
+
+        Returns:
+            ModelType: 创建的对象
+
+        Raises:
+            DatabaseError: 数据库错误
+        """
+        try:
+            obj_in_data = jsonable_encoder(obj_in)
+            db_obj = self.model(**obj_in_data)
+            db.add(db_obj)
+            db.commit()
+            db.refresh(db_obj)
+            return db_obj
+        except SQLAlchemyError as e:
+            db.rollback()
+            logger.error(f"Failed to create {self.model.__name__}: {e}")
+            raise DatabaseError(f"Failed to create {self.model.__name__}") from e
+
+    def update(
+        self,
+        db: Session,
+        *,
+        db_obj: ModelType,
+        obj_in: Union[UpdateSchemaType, Dict[str, Any]],
+    ) -> ModelType:
+        """更新对象。
+
+        Args:
+            db: 数据库会话
+            db_obj: 数据库对象
+            obj_in: 更新数据
+
+        Returns:
+            ModelType: 更新后的对象
+
+        Raises:
+            DatabaseError: 数据库错误
+        """
+        try:
+            obj_data = jsonable_encoder(db_obj)
+            if isinstance(obj_in, dict):
+                update_data = obj_in
+            else:
+                update_data = obj_in.dict(exclude_unset=True)
+            for field in obj_data:
+                if field in update_data:
+                    setattr(db_obj, field, update_data[field])
+            db.add(db_obj)
+            db.commit()
+            db.refresh(db_obj)
+            return db_obj
+        except SQLAlchemyError as e:
+            db.rollback()
+            logger.error(f"Failed to update {self.model.__name__}: {e}")
+            raise DatabaseError(f"Failed to update {self.model.__name__}") from e
+
+    def delete(self, db: Session, *, id: Any) -> ModelType:
+        """删除对象。
+
+        Args:
+            db: 数据库会话
+            id: 对象ID
+
+        Returns:
+            ModelType: 删除的对象
+
+        Raises:
+            DatabaseError: 数据库错误
+        """
+        try:
+            obj = db.query(self.model).get(id)
+            if obj:
+                db.delete(obj)
+                db.commit()
+            return obj
+        except SQLAlchemyError as e:
+            db.rollback()
+            logger.error(f"Failed to delete {self.model.__name__}: {e}")
+            raise DatabaseError(f"Failed to delete {self.model.__name__}") from e
+
+    def count(
+        self,
+        db: Session,
+        *,
+        filters: Optional[Dict[str, Any]] = None,
+    ) -> int:
+        """获取对象数量。
+
+        Args:
+            db: 数据库会话
+            filters: 过滤条件
+
+        Returns:
+            int: 对象数量
+
+        Raises:
+            DatabaseError: 数据库错误
+        """
+        try:
+            query = select([self.model])
+            if filters:
+                for key, value in filters.items():
+                    if hasattr(self.model, key):
+                        query = query.where(getattr(self.model, key) == value)
+            return db.execute(query).count()
+        except SQLAlchemyError as e:
+            logger.error(f"Failed to count {self.model.__name__}: {e}")
+            raise DatabaseError(f"Failed to count {self.model.__name__}") from e
+
+    def exists(self, db: Session, *, id: Any) -> bool:
+        """检查对象是否存在。
+
+        Args:
+            db: 数据库会话
+            id: 对象ID
+
+        Returns:
+            bool: 是否存在
+
+        Raises:
+            DatabaseError: 数据库错误
+        """
+        try:
+            return db.query(self.model).filter(self.model.id == id).first() is not None
+        except SQLAlchemyError as e:
+            logger.error(f"Failed to check {self.model.__name__} existence: {e}")
+            raise DatabaseError(
+                f"Failed to check {self.model.__name__} existence"
+            ) from e 

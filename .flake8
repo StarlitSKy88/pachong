@@ -1,0 +1,34 @@
+[flake8]
+max-line-length = 100
+max-complexity = 10
+exclude = 
+    .git,
+    __pycache__,
+    build,
+    dist,
+    *.egg-info,
+    venv,
+    .env,
+    .venv,
+    .tox,
+    .pytest_cache,
+    .mypy_cache,
+    .coverage,
+    htmlcov
+ignore = 
+    # E203: whitespace before ':' (black formatting)
+    E203,
+    # W503: line break before binary operator (black formatting)
+    W503,
+    # E501: line too long (handled by black)
+    E501
+per-file-ignores =
+    # F401: imported but unused (allow unused imports in __init__.py)
+    __init__.py:F401
+    # F403: 'from module import *' used (allow in __init__.py)
+    __init__.py:F403
+    # F405: name may be undefined, or defined from star imports (allow in __init__.py)
+    __init__.py:F405
+    # E402: module level import not at top of file (allow in tests)
+    tests/*:E402
+extend-ignore = E203 

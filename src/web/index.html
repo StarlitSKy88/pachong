@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>告警系统</title>
+    <link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css">
+    <script src="https://unpkg.com/vue@3"></script>
+    <script src="https://unpkg.com/element-plus"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <style>
+        .container {
+            padding: 20px;
+        }
+        .alert-card {
+            margin-bottom: 20px;
+        }
+        .alert-info { color: #409EFF; }
+        .alert-warning { color: #E6A23C; }
+        .alert-error { color: #F56C6C; }
+        .alert-critical { color: #ff0000; }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <el-container>
+            <el-header>
+                <el-menu mode="horizontal" :router="true">
+                    <el-menu-item index="1">告警规则</el-menu-item>
+                    <el-menu-item index="2">活动告警</el-menu-item>
+                    <el-menu-item index="3">告警历史</el-menu-item>
+                    <el-menu-item index="4">统计信息</el-menu-item>
+                </el-menu>
+            </el-header>
+            
+            <el-main>
+                <div class="container">
+                    <!-- 告警规则管理 -->
+                    <el-card v-if="activeTab === 1">
+                        <template #header>
+                            <div class="card-header">
+                                <span>告警规则管理</span>
+                                <el-button style="float: right" type="primary" @click="showCreateRuleDialog">
+                                    添加规则
+                                </el-button>
+                            </div>
+                        </template>
+                        
+                        <el-collapse>
+                            <el-collapse-item v-for="group in rules" :key="group.name" :title="group.name">
+                                <el-table :data="group.rules">
+                                    <el-table-column prop="name" label="规则名称"></el-table-column>
+                                    <el-table-column prop="metric" label="指标"></el-table-column>
+                                    <el-table-column prop="operator" label="操作符"></el-table-column>
+                                    <el-table-column prop="threshold" label="阈值"></el-table-column>
+                                    <el-table-column prop="severity" label="级别">
+                                        <template #default="scope">
+                                            <el-tag :type="getSeverityType(scope.row.severity)">
+                                                {{ scope.row.severity }}
+                                            </el-tag>
+                                        </template>
+                                    </el-table-column>
+                                    <el-table-column prop="status" label="状态">
+                                        <template #default="scope">
+                                            <el-tag :type="getStatusType(scope.row.status)">
+                                                {{ scope.row.status }}
+                                            </el-tag>
+                                        </template>
+                                    </el-table-column>
+                                    <el-table-column label="操作">
+                                        <template #default="scope">
+                                            <el-switch
+                                                v-model="scope.row.enabled"
+                                                @change="toggleRule(group.name, scope.row)"
+                                            ></el-switch>
+                                        </template>
+                                    </el-table-column>
+                                </el-table>
+                            </el-collapse-item>
+                        </el-collapse>
+                    </el-card>
+                    
+                    <!-- 活动告警 -->
+                    <el-card v-if="activeTab === 2">
+                        <template #header>
+                            <div class="card-header">
+                                <span>活动告警</span>
+                                <el-button style="float: right" type="primary" @click="refreshActiveAlerts">
+                                    刷新
+                                </el-button>
+                            </div>
+                        </template>
+                        
+                        <el-table :data="activeAlerts">
+                            <el-table-column prop="name" label="规则名称"></el-table-column>
+                            <el-table-column prop="description" label="描述"></el-table-column>
+                            <el-table-column prop="metric" label="指标"></el-table-column>
+                            <el-table-column prop="value" label="当前值"></el-table-column>
+                            <el-table-column prop="threshold" label="阈值"></el-table-column>
+                            <el-table-column prop="severity" label="级别">
+                                <template #default="scope">
+                                    <el-tag :type="getSeverityType(scope.row.severity)">
+                                        {{ scope.row.severity }}
+                                    </el-tag>
+                                </template>
+                            </el-table-column>
+                            <el-table-column prop="timestamp" label="时间"></el-table-column>
+                        </el-table>
+                    </el-card>
+                    
+                    <!-- 告警历史 -->
+                    <el-card v-if="activeTab === 3">
+                        <template #header>
+                            <div class="card-header">
+                                <span>告警历史</span>
+                                <el-form :inline="true">
+                                    <el-form-item label="时间范围">
+                                        <el-select v-model="historyHours" @change="loadAlertHistory">
+                                            <el-option label="24小时" :value="24"></el-option>
+                                            <el-option label="48小时" :value="48"></el-option>
+                                            <el-option label="7天" :value="168"></el-option>
+                                        </el-select>
+                                    </el-form-item>
+                                    <el-form-item label="级别">
+                                        <el-select v-model="historySeverity" @change="loadAlertHistory">
+                                            <el-option label="全部" value=""></el-option>
+                                            <el-option label="信息" value="info"></el-option>
+                                            <el-option label="警告" value="warning"></el-option>
+                                            <el-option label="错误" value="error"></el-option>
+                                            <el-option label="严重" value="critical"></el-option>
+                                        </el-select>
+                                    </el-form-item>
+                                </el-form>
+                            </div>
+                        </template>
+                        
+                        <el-timeline>
+                            <el-timeline-item
+                                v-for="alert in alertHistory"
+                                :key="alert.timestamp"
+                                :type="getSeverityType(alert.severity)"
+                                :timestamp="alert.timestamp"
+                            >
+                                <h4>{{ alert.name }}</h4>
+                                <p>{{ alert.description }}</p>
+                                <p>当前值: {{ alert.value }} (阈值: {{ alert.threshold }})</p>
+                            </el-timeline-item>
+                        </el-timeline>
+                    </el-card>
+                    
+                    <!-- 统计信息 -->
+                    <el-card v-if="activeTab === 4">
+                        <template #header>
+                            <div class="card-header">
+                                <span>统计信息</span>
+                                <el-button style="float: right" type="primary" @click="refreshStats">
+                                    刷新
+                                </el-button>
+                            </div>
+                        </template>
+                        
+                        <el-row :gutter="20">
+                            <el-col :span="12">
+                                <el-card class="box-card">
+                                    <template #header>
+                                        <div class="card-header">
+                                            <span>告警聚合统计</span>
+                                        </div>
+                                    </template>
+                                    <el-table :data="Object.entries(aggregationStats)">
+                                        <el-table-column prop="0" label="规则名称"></el-table-column>
+                                        <el-table-column label="统计信息">
+                                            <template #default="scope">
+                                                <p>数量: {{ scope.row[1].count }}</p>
+                                                <p>频率: {{ scope.row[1].frequency.toFixed(2) }}/分钟</p>
+                                                <p>级别: {{ scope.row[1].severity }}</p>
+                                            </template>
+                                        </el-table-column>
+                                    </el-table>
+                                </el-card>
+                            </el-col>
+                            
+                            <el-col :span="12">
+                                <el-card class="box-card">
+                                    <template #header>
+                                        <div class="card-header">
+                                            <span>当前指标</span>
+                                        </div>
+                                    </template>
+                                    <el-table :data="Object.entries(metrics)">
+                                        <el-table-column prop="0" label="指标名称"></el-table-column>
+                                        <el-table-column prop="1" label="当前值"></el-table-column>
+                                    </el-table>
+                                </el-card>
+                            </el-col>
+                        </el-row>
+                    </el-card>
+                </div>
+                
+                <!-- 创建规则对话框 -->
+                <el-dialog v-model="createRuleDialog" title="创建告警规则">
+                    <el-form :model="newRule" label-width="100px">
+                        <el-form-item label="规则名称">
+                            <el-input v-model="newRule.name"></el-input>
+                        </el-form-item>
+                        <el-form-item label="指标">
+                            <el-input v-model="newRule.metric"></el-input>
+                        </el-form-item>
+                        <el-form-item label="操作符">
+                            <el-select v-model="newRule.operator">
+                                <el-option label="大于" value=">"></el-option>
+                                <el-option label="小于" value="<"></el-option>
+                                <el-option label="大于等于" value=">="></el-option>
+                                <el-option label="小于等于" value="<="></el-option>
+                                <el-option label="等于" value="=="></el-option>
+                                <el-option label="不等于" value="!="></el-option>
+                            </el-select>
+                        </el-form-item>
+                        <el-form-item label="阈值">
+                            <el-input-number v-model="newRule.threshold"></el-input-number>
+                        </el-form-item>
+                        <el-form-item label="级别">
+                            <el-select v-model="newRule.severity">
+                                <el-option label="信息" value="info"></el-option>
+                                <el-option label="警告" value="warning"></el-option>
+                                <el-option label="错误" value="error"></el-option>
+                                <el-option label="严重" value="critical"></el-option>
+                            </el-select>
+                        </el-form-item>
+                        <el-form-item label="规则组">
+                            <el-select v-model="newRule.group">
+                                <el-option
+                                    v-for="group in rules"
+                                    :key="group.name"
+                                    :label="group.name"
+                                    :value="group.name"
+                                ></el-option>
+                            </el-select>
+                        </el-form-item>
+                        <el-form-item label="描述">
+                            <el-input type="textarea" v-model="newRule.description"></el-input>
+                        </el-form-item>
+                    </el-form>
+                    <template #footer>
+                        <span class="dialog-footer">
+                            <el-button @click="createRuleDialog = false">取消</el-button>
+                            <el-button type="primary" @click="createRule">确定</el-button>
+                        </span>
+                    </template>
+                </el-dialog>
+            </el-main>
+        </el-container>
+    </div>
+    
+    <script>
+        const { createApp, ref, onMounted } = Vue
+        
+        const app = createApp({
+            setup() {
+                const activeTab = ref(1)
+                const rules = ref([])
+                const activeAlerts = ref([])
+                const alertHistory = ref([])
+                const aggregationStats = ref({})
+                const metrics = ref({})
+                const createRuleDialog = ref(false)
+                const historyHours = ref(24)
+                const historySeverity = ref('')
+                
+                const newRule = ref({
+                    name: '',
+                    metric: '',
+                    operator: '>',
+                    threshold: 0,
+                    severity: 'warning',
+                    description: '',
+                    group: ''
+                })
+                
+                // 加载规则列表
+                const loadRules = async () => {
+                    try {
+                        const response = await axios.get('/api/rules')
+                        rules.value = response.data
+                    } catch (error) {
+                        console.error('加载规则失败:', error)
+                        ElMessage.error('加载规则失败')
+                    }
+                }
+                
+                // 加载活动告警
+                const loadActiveAlerts = async () => {
+                    try {
+                        const response = await axios.get('/api/alerts/active')
+                        activeAlerts.value = response.data
+                    } catch (error) {
+                        console.error('加载活动告警失败:', error)
+                        ElMessage.error('加载活动告警失败')
+                    }
+                }
+                
+                // 加载告警历史
+                const loadAlertHistory = async () => {
+                    try {
+                        const params = {
+                            hours: historyHours.value
+                        }
+                        if (historySeverity.value) {
+                            params.severity = historySeverity.value
+                        }
+                        const response = await axios.get('/api/alerts/history', { params })
+                        alertHistory.value = response.data
+                    } catch (error) {
+                        console.error('加载告警历史失败:', error)
+                        ElMessage.error('加载告警历史失败')
+                    }
+                }
+                
+                // 加载统计信息
+                const loadStats = async () => {
+                    try {
+                        const [statsResponse, metricsResponse] = await Promise.all([
+                            axios.get('/api/stats/aggregation'),
+                            axios.get('/api/metrics')
+                        ])
+                        aggregationStats.value = statsResponse.data
+                        metrics.value = metricsResponse.data
+                    } catch (error) {
+                        console.error('加载统计信息失败:', error)
+                        ElMessage.error('加载统计信息失败')
+                    }
+                }
+                
+                // 创建规则
+                const createRule = async () => {
+                    try {
+                        await axios.post('/api/rules/rule', newRule.value)
+                        ElMessage.success('创建规则成功')
+                        createRuleDialog.value = false
+                        await loadRules()
+                    } catch (error) {
+                        console.error('创建规则失败:', error)
+                        ElMessage.error('创建规则失败')
+                    }
+                }
+                
+                // 切换规则状态
+                const toggleRule = async (groupName, rule) => {
+                    try {
+                        const url = `/api/rules/group/${groupName}/${rule.enabled ? 'enable' : 'disable'}`
+                        await axios.put(url)
+                        ElMessage.success(`${rule.enabled ? '启用' : '禁用'}规则成功`)
+                    } catch (error) {
+                        console.error('切换规则状态失败:', error)
+                        ElMessage.error('切换规则状态失败')
+                        rule.enabled = !rule.enabled
+                    }
+                }
+                
+                // 工具函数
+                const getSeverityType = (severity) => {
+                    const types = {
+                        'info': 'info',
+                        'warning': 'warning',
+                        'error': 'danger',
+                        'critical': 'danger'
+                    }
+                    return types[severity] || 'info'
+                }
+                
+                const getStatusType = (status) => {
+                    const types = {
+                        'normal': 'success',
+                        'alerting': 'danger',
+                        'recovered': 'info',
+                        'silenced': 'warning'
+                    }
+                    return types[status] || 'info'
+                }
+                
+                // 刷新函数
+                const refreshActiveAlerts = () => loadActiveAlerts()
+                const refreshStats = () => loadStats()
+                const showCreateRuleDialog = () => {
+                    newRule.value = {
+                        name: '',
+                        metric: '',
+                        operator: '>',
+                        threshold: 0,
+                        severity: 'warning',
+                        description: '',
+                        group: ''
+                    }
+                    createRuleDialog.value = true
+                }
+                
+                // 初始化
+                onMounted(() => {
+                    loadRules()
+                    loadActiveAlerts()
+                    loadAlertHistory()
+                    loadStats()
+                    
+                    // 定时刷新
+                    setInterval(loadActiveAlerts, 30000)
+                    setInterval(loadStats, 60000)
+                })
+                
+                return {
+                    activeTab,
+                    rules,
+                    activeAlerts,
+                    alertHistory,
+                    aggregationStats,
+                    metrics,
+                    createRuleDialog,
+                    newRule,
+                    historyHours,
+                    historySeverity,
+                    getSeverityType,
+                    getStatusType,
+                    refreshActiveAlerts,
+                    refreshStats,
+                    showCreateRuleDialog,
+                    createRule,
+                    toggleRule,
+                    loadAlertHistory
+                }
+            }
+        })
+        
+        app.use(ElementPlus)
+        app.mount('#app')
+    </script>
+</body>
+</html> 

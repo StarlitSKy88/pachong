@@ -10,17 +10,30 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from unittest.mock import MagicMock, AsyncMock
 from sqlalchemy.pool import StaticPool
+from loguru import logger
 
-from src.models import Base
-from src.models.platform import Platform
-from src.models.content import Content
-from src.models.tag import Tag
-from src.models.generated_content import GeneratedContent
-from src.models.report import Report
+from src.models import (
+    Base,
+    Platform,
+    Tag,
+    Content,
+    ContentType,
+    ContentStatus,
+    Comment,
+    GeneratedContent,
+    Report,
+    content_tags,
+    report_contents
+)
 from src.database.session import async_session_factory as Session
+from src.database.session import engine, async_session_factory, init_db
+from .test_settings import test_settings
 
 # 创建内存数据库
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+
+# 配置日志
+logger.configure(**test_settings.get_log_config())
 
 class TestDataFactory:
     """测试数据工厂"""
@@ -91,36 +104,18 @@ def event_loop():
     loop.close()
 
 @pytest.fixture(scope="session")
-async def engine():
-    """创建数据库引擎"""
-    engine = create_async_engine(
-        TEST_DATABASE_URL,
-        poolclass=StaticPool,
-        echo=False
-    )
-    
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    
-    yield engine
-    
+async def init_database():
+    """初始化数据库"""
+    await init_db()
+    yield
+    # 清理数据库
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
-    await engine.dispose()
-
-@pytest.fixture(scope="session")
-def session_factory(engine):
-    """创建会话工厂"""
-    return sessionmaker(
-        bind=engine,
-        class_=AsyncSession,
-        expire_on_commit=False
-    )
 
 @pytest.fixture
-async def db_session(session_factory) -> AsyncGenerator[AsyncSession, None]:
+async def db_session(init_database) -> AsyncGenerator[AsyncSession, None]:
     """创建数据库会话"""
-    async with session_factory() as session:
+    async with async_session_factory() as session:
         try:
             yield session
         finally:
@@ -135,13 +130,7 @@ def test_data_dir(tmp_path_factory) -> Path:
 @pytest.fixture(scope="session")
 def test_db_config() -> Dict[str, Any]:
     """测试数据库配置"""
-    return {
-        "url": TEST_DATABASE_URL,
-        "engine_kwargs": {
-            "poolclass": StaticPool,
-            "echo": False
-        }
-    }
+    return test_settings.get_test_database_config()
 
 @pytest.fixture(scope="session")
 def test_crawler_config() -> Dict[str, Any]:
@@ -162,7 +151,13 @@ def test_crawler_config() -> Dict[str, Any]:
 @pytest.fixture
 async def sample_platform(db_session) -> Platform:
     """创建示例平台"""
-    platform = TestDataFactory.create_platform()
+    platform = Platform(
+        name="test_platform",
+        description="Test Platform",
+        base_url="https://test.com",
+        enabled=True,
+        config={}
+    )
     db_session.add(platform)
     await db_session.commit()
     await db_session.refresh(platform)
@@ -171,7 +166,12 @@ async def sample_platform(db_session) -> Platform:
 @pytest.fixture
 async def sample_tag(db_session) -> Tag:
     """创建示例标签"""
-    tag = TestDataFactory.create_tag()
+    tag = Tag(
+        name="test_tag",
+        description="Test Tag",
+        level=0,
+        weight=1.0
+    )
     db_session.add(tag)
     await db_session.commit()
     await db_session.refresh(tag)
@@ -180,7 +180,18 @@ async def sample_tag(db_session) -> Tag:
 @pytest.fixture
 async def sample_content(db_session, sample_platform) -> Content:
     """创建示例内容"""
-    content = TestDataFactory.create_content(sample_platform)
+    content = Content(
+        title="Test Content",
+        content="Test content body",
+        author_name="Test Author",
+        author_id="test_author_id",
+        platform_id=sample_platform.id,
+        url="https://test.com/content/1",
+        images=[],
+        publish_time=datetime.now(),
+        content_type=ContentType.ARTICLE,
+        status=ContentStatus.DRAFT
+    )
     db_session.add(content)
     await db_session.commit()
     await db_session.refresh(content)
@@ -378,4 +389,66 @@ def mock_detail_response():
                 "video": "video1.mp4"
             }
         }
-    } 
+    }
+
+@pytest.fixture
+async def storage():
+    """初始化存储"""
+    from src.database.sqlite_storage import SQLiteStorage
+    
+    # 使用测试数据库
+    db_path = Path(test_settings.BASE_DIR) / "data" / "test.db"
+    storage = SQLiteStorage(str(db_path))
+    await storage.init()
+    
+    yield storage
+    
+    # 清理测试数据
+    if db_path.exists():
+        os.remove(db_path)
+
+@pytest.fixture
+async def cache():
+    """初始化缓存"""
+    from src.database.cache_storage import CacheStorage
+    
+    cache = CacheStorage(test_settings.REDIS_URL)
+    await cache.init()
+    
+    yield cache
+    
+    # 清理缓存
+    await cache.clear()
+    await cache.close()
+
+@pytest.fixture
+async def cached_storage(storage, cache):
+    """初始化带缓存的存储"""
+    from src.database.cache_storage import CachedStorage
+    
+    cached_storage = CachedStorage(storage, cache)
+    yield cached_storage
+
+@pytest.fixture
+async def perf_monitor():
+    """初始化性能监控"""
+    from src.monitor.performance_monitor import PerformanceMonitor
+    
+    monitor = PerformanceMonitor()
+    await monitor.start()
+    
+    yield monitor
+    
+    await monitor.stop()
+
+@pytest.fixture
+async def business_monitor(cached_storage):
+    """初始化业务监控"""
+    from src.monitor.business_monitor import BusinessMonitor
+    
+    monitor = BusinessMonitor(cached_storage)
+    await monitor.start()
+    
+    yield monitor
+    
+    await monitor.stop() 

@@ -3,8 +3,11 @@ from datetime import datetime
 from langsmith import Client
 from langsmith.run_trees import RunTree
 from langsmith.schemas import Run, Field
-from langsmith.evaluation import BaseModel
 from dotenv import load_dotenv
+from typing import Any, Dict, Optional
+import logging
+
+logger = logging.getLogger(__name__)
 
 class LangSmithHelper:
     def __init__(self):
@@ -31,97 +34,63 @@ class LangSmithHelper:
         
         self.project_name = os.getenv("LANGCHAIN_PROJECT", "crawler_test")
     
-    def start_trace(self, name: str) -> Run:
-        """开始一个测试追踪
-        
+    def start_trace(self, name: str):
+        """开始追踪
+
         Args:
-            name: 测试名称
-            
+            name: 追踪名称
+
         Returns:
             追踪对象
         """
-        return self.client.create_run(
-            name=name,
-            run_type="chain",
-            project_name=self.project_name,
-            extra={
-                "test_type": "crawler",
-                "timestamp": datetime.now().isoformat()
-            }
-        )
-    
-    def log_request(self, run: Run, url: str, response: dict):
-        """记录请求信息
-        
-        Args:
-            run: 运行对象
-            url: 请求URL
-            response: 响应数据
-        """
-        try:
-            self.client.create_run(
-                name="http_request",
-                run_type="tool",
-                inputs={"url": url},
-                outputs=response,
-                parent_run=run
-            )
-        except Exception as e:
-            print(f"记录请求信息失败: {str(e)}")
-    
-    def log_parse(self, run: Run, raw_data: dict, parsed_data: dict):
-        """记录解析结果
-        
-        Args:
-            run: 运行对象
-            raw_data: 原始数据
-            parsed_data: 解析后的数据
-        """
-        try:
-            self.client.create_run(
-                name="data_parse",
-                run_type="chain",
-                inputs=raw_data,
-                outputs=parsed_data,
-                parent_run=run
-            )
-        except Exception as e:
-            print(f"记录解析结果失败: {str(e)}")
-    
-    def log_error(self, run: Run, error: Exception):
-        """记录错误信息
-        
-        Args:
-            run: 运行对象
-            error: 异常对象
-        """
-        try:
-            self.client.create_run(
-                name="error",
-                run_type="tool",
-                inputs={"error_type": type(error).__name__},
-                outputs={"message": str(error)},
-                error=error,
-                parent_run=run
-            )
-        except Exception as e:
-            print(f"记录错误信息失败: {str(e)}")
-    
-    def end_trace(self, run: Run, success: bool = True):
+        return {"name": name, "start_time": datetime.now()}
+
+    async def end_trace(self, trace):
         """结束追踪
-        
+
         Args:
-            run: 运行对象
-            success: 是否成功
+            trace: 追踪对象
         """
-        try:
-            self.client.update_run(
-                run.id,
-                end_time=datetime.now(),
-                error=None if success else "Test failed"
-            )
-        except Exception as e:
-            print(f"结束追踪失败: {str(e)}")
+        if trace is None:
+            return
+        
+        trace["end_time"] = datetime.now()
+        duration = trace["end_time"] - trace["start_time"]
+        logger.info(f"Trace {trace['name']} completed in {duration.total_seconds():.2f}s")
+
+    def log_request(self, trace, name: str, data: Any):
+        """记录请求
+
+        Args:
+            trace: 追踪对象
+            name: 请求名称
+            data: 请求数据
+        """
+        if trace is None:
+            return
+        
+        logger.info(f"Request {name}: {data}")
+
+    def log_parse(self, trace: Dict[str, Any], input_data: Dict[str, Any], output_data: Dict[str, Any]) -> None:
+        """记录解析"""
+        trace["events"].append({
+            "type": "parse",
+            "time": datetime.now(),
+            "input": input_data,
+            "output": output_data
+        })
+    
+    def log_error(self, trace, error: Exception):
+        """记录错误
+
+        Args:
+            trace: 追踪对象
+            error: 错误对象
+        """
+        if trace is None:
+            return
+        
+        logger.error(f"Error in trace {trace['name']}: {error}")
     
     def get_test_stats(self) -> dict:
         """获取测试统计信息
@@ -239,9 +208,6 @@ class LangSmithHelper:
         Returns:
             评估函数
         """
-        class Grade(BaseModel):
-            score: bool = Field(description="评估结果是否正确")
-            
         def accuracy(outputs: dict, reference_outputs: dict) -> bool:
             response = self.client.chat.completions.create(
                 model="deepseek-chat",

@@ -1,97 +1,88 @@
 # 内容采集和分析系统
 
-## 项目简介
+## 项目概述
 
-本系统是一个专业的内容采集和分析平台，专注于从多个平台（如小红书、B站等）采集特定主题的内容，并提供深度分析和内容生成功能。
+这是一个基于Python的内容采集和分析系统，支持从多个平台（如小红书、B站）采集内容，并进行智能分析和处理。
 
-### 核心特性
+## 核心功能
 
-- 多平台内容采集
-- 智能内容分析
-- 自动化内容生成
-- 实时监控和告警
-- 高质量内容筛选
+1. 内容采集
+   - 多平台支持（小红书、B站）
+   - 智能代理池
+   - Cookie管理
+   - 反爬处理
+
+2. 内容分析
+   - 质量评估
+   - 主题分析
+   - 相关性评估
+   - 标签推荐
+
+3. 数据处理
+   - 数据清洗
+   - 数据存储
+   - 数据分析
+   - 数据导出
+
+4. 系统功能
+   - 监控告警
+   - 任务调度
+   - 性能优化
+   - 日志管理
+
+## 技术栈
+
+- 语言：Python 3.8+
+- 数据库：SQLite/MySQL
+- 缓存：Redis
+- Web框架：FastAPI
+- 任务队列：Celery
+- 监控：Prometheus + Grafana
 
 ## 快速开始
 
-### 环境要求
-
-- Python 3.8+
-- MongoDB
-- Redis
-- RabbitMQ
-
-### 安装步骤
-
-1. 克隆项目
-```bash
-git clone [项目地址]
-cd [项目目录]
-```
-
-2. 安装依赖
+1. 环境准备
 ```bash
 python -m venv venv
 source venv/bin/activate  # Linux/Mac
-# 或
-.\venv\Scripts\activate  # Windows
+venv\Scripts\activate  # Windows
 pip install -r requirements.txt
 ```
 
-3. 配置环境变量
+2. 配置
 ```bash
 cp .env.example .env
-# 编辑 .env 文件，配置必要的环境变量
+# 编辑.env文件，配置必要的参数
 ```
 
-## 主要功能
-
-### 1. 内容采集
-- 支持多平台内容采集
-- 自定义采集规则
-- 数据清洗和预处理
-- 增量更新支持
-
-### 2. 数据分析
-- 内容质量评估
-- 热点话题分析
-- 用户行为分析
-- 趋势预测
-
-### 3. 内容生成
-- 小红书格式内容
-- HTML爆款内容
-- 3分钟中文播客
-- 自动化标签生成
-
-## 项目结构
-
-```
-src/
-├── crawlers/        # 爬虫模块
-├── processors/      # 数据处理
-├── analyzers/       # 数据分析
-├── generators/      # 内容生成
-├── monitor/         # 监控系统
-└── utils/           # 工具函数
+3. 运行
+```bash
+python -m src.cli run
 ```
 
 ## 文档导航
 
-- [入门指南](./getting-started/README.md)
-- [开发文档](./development/README.md)
-- [部署指南](./deployment/README.md)
-- [使用手册](./user-guide/README.md)
+- [系统架构](ARCHITECTURE.md)
+- [开发指南](DEVELOPMENT.md)
+- [部署文档](DEPLOYMENT.md)
+- [API文档](API.md)
+- [监控运维](MONITORING.md)
 
-## 技术支持
+## 项目状态
 
-- 问题反馈：提交Issue
-- 贡献代码：提交Pull Request
-- 技术讨论：加入技术社群
+当前版本：v0.1.0
 
-## 版本记录
+- [x] 基础架构搭建
+- [x] 爬虫系统实现
+- [x] 内容分析器
+- [ ] 数据存储优化
+- [ ] 监控系统
+- [ ] Web接口
 
-- v0.1.0 (2024-03-27)
-  - 项目初始化
-  - 基础架构搭建
-  - 核心功能实现 
+## 贡献指南
+
+请参阅 [CONTRIBUTING.md](../CONTRIBUTING.md)
+
+## 许可证
+
+MIT License - 详见 [LICENSE](../LICENSE) 

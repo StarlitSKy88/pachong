@@ -8,18 +8,177 @@ from .cookie_manager import CookieManager
 from .xhs_sign import XHSSign
 import asyncio
 import random
+import time
+import hashlib
 
 class XHSCrawler(BaseCrawler):
     """小红书爬虫"""
     
-    def __init__(self):
-        super().__init__('xiaohongshu')
+    def __init__(self, timeout: int = 30, proxy: str = None):
+        super().__init__(timeout, proxy)
+        self.base_url = "https://www.xiaohongshu.com"
+        self.api_base = "https://edith.xiaohongshu.com"
+        self.headers.update({
+            'Origin': 'https://www.xiaohongshu.com',
+            'Referer': 'https://www.xiaohongshu.com',
+            'Content-Type': 'application/json;charset=UTF-8'
+        })
         self.proxy_pool = ProxyManager()
         self.cookie_manager = CookieManager()
         self.sign_generator = XHSSign()
         self.search_url = 'https://www.xiaohongshu.com/web_api/sns/v3/search/note'
         self.detail_url = 'https://www.xiaohongshu.com/web_api/sns/v1/note/{note_id}'
         
+    def _sign_params(self, params: Dict) -> str:
+        """签名参数"""
+        # 这里需要实现小红书的签名算法
+        # 目前使用占位实现
+        return "placeholder_signature"
+    
+    async def search(self, keyword: str, time_range: str, limit: int) -> List[Dict[str, Any]]:
+        """搜索笔记"""
+        results = []
+        page = 1
+        page_size = 20
+        
+        while len(results) < limit:
+            try:
+                # 构造搜索参数
+                params = {
+                    "keyword": keyword,
+                    "page": page,
+                    "page_size": page_size,
+                    "sort": "time_desc",
+                    "note_type": "0"
+                }
+                
+                # 添加签名
+                sign = self._sign_params(params)
+                params['sign'] = sign
+                
+                # 发送请求
+                url = f"{self.api_base}/api/sns/web/v1/search/notes"
+                response = await self._get(url, params)
+                
+                if not response.get('data', {}).get('notes'):
+                    break
+                
+                # 解析结果
+                items = []
+                for note in response['data']['notes']:
+                    try:
+                        item = {
+                            'platform': 'xhs',
+                            'id': note['id'],
+                            'title': note['title'],
+                            'content': note.get('desc', ''),
+                            'author': note['user']['nickname'],
+                            'author_id': note['user']['user_id'],
+                            'publish_time': note['time'],
+                            'likes': note.get('likes', 0),
+                            'comments': note.get('comments', 0),
+                            'shares': note.get('shares', 0),
+                            'url': f"{self.base_url}/discovery/item/{note['id']}",
+                            'images': [img['url'] for img in note.get('images', [])],
+                            'type': 'video' if note.get('video') else 'image'
+                        }
+                        items.append(item)
+                    except Exception as e:
+                        self.logger.error(f"解析笔记失败: {str(e)}")
+                        continue
+                
+                # 按时间过滤
+                filtered_items = self.filter_by_time(items, time_range)
+                results.extend(filtered_items)
+                
+                # 检查是否需要继续
+                if len(response['data']['notes']) < page_size:
+                    break
+                    
+                page += 1
+                
+                # 添加随机延迟
+                await asyncio.sleep(random.uniform(1, 3))
+                
+            except Exception as e:
+                self.logger.error(f"搜索失败: {str(e)}")
+                break
+        
+        return results[:limit]
+    
+    async def get_detail(self, item_id: str) -> Dict[str, Any]:
+        """获取笔记详情"""
+        try:
+            url = f"{self.api_base}/api/sns/web/v1/feed"
+            params = {
+                "note_id": item_id,
+                "source": "web"
+            }
+            
+            # 添加签名
+            sign = self._sign_params(params)
+            params['sign'] = sign
+            
+            response = await self._get(url, params)
+            note = response['data']
+            
+            return {
+                'platform': 'xhs',
+                'id': note['id'],
+                'title': note['title'],
+                'content': note.get('desc', ''),
+                'author': note['user']['nickname'],
+                'author_id': note['user']['user_id'],
+                'publish_time': note['time'],
+                'likes': note.get('likes', 0),
+                'comments': note.get('comments', 0),
+                'shares': note.get('shares', 0),
+                'url': f"{self.base_url}/discovery/item/{note['id']}",
+                'images': [img['url'] for img in note.get('images', [])],
+                'type': 'video' if note.get('video') else 'image',
+                'topics': [topic['name'] for topic in note.get('topics', [])],
+                'location': note.get('location', {}),
+                'comments_data': await self._get_comments(item_id)
+            }
+            
+        except Exception as e:
+            self.logger.error(f"获取笔记详情失败: {str(e)}")
+            raise
+    
+    async def _get_comments(self, item_id: str, limit: int = 20) -> List[Dict]:
+        """获取评论"""
+        try:
+            url = f"{self.api_base}/api/sns/web/v1/comment/list"
+            params = {
+                "note_id": item_id,
+                "page": 1,
+                "page_size": limit,
+                "sort": "time"
+            }
+            
+            # 添加签名
+            sign = self._sign_params(params)
+            params['sign'] = sign
+            
+            response = await self._get(url, params)
+            
+            comments = []
+            for comment in response['data']['comments']:
+                comments.append({
+                    'id': comment['id'],
+                    'content': comment['content'],
+                    'user': comment['user']['nickname'],
+                    'user_id': comment['user']['user_id'],
+                    'time': comment['time'],
+                    'likes': comment.get('likes', 0)
+                })
+            
+            return comments
+            
+        except Exception as e:
+            self.logger.error(f"获取评论失败: {str(e)}")
+            return []
+    
     def _get_default_headers(self) -> Dict[str, str]:
         """获取默认请求头"""
         headers = super()._get_default_headers()

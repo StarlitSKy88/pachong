@@ -1,215 +1,347 @@
-import functools
-import traceback
-import asyncio
-from typing import Callable, Any, Dict, Optional, Type, List
-from datetime import datetime
-from .logger import get_logger
-from .exceptions import CrawlerException
+"""错误处理模块。"""
+
+from typing import Any, Dict, Optional, Type, Union
+
+from fastapi import HTTPException, Request, status
+from fastapi.responses import JSONResponse
+
+from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-def handle_error(
-    error_type: Type[CrawlerException],
-    reraise: bool = True,
-    log_level: str = "error",
-    **kwargs
-) -> Callable:
-    """错误处理装饰器
-    
-    Args:
-        error_type: 异常类型
-        reraise: 是否重新抛出异常
-        log_level: 日志级别
-        **kwargs: 传递给异常的额外参数
-    
-    Returns:
-        Callable: 装饰器函数
-    """
-    def decorator(func: Callable) -> Callable:
-        @functools.wraps(func)
-        async def async_wrapper(*args, **kw) -> Any:
-            try:
-                return await func(*args, **kw)
-            except Exception as e:
-                # 获取错误信息
-                error_info = _get_error_info(e)
-                
-                # 创建自定义异常
-                custom_error = error_type(
-                    message=str(e),
-                    details={**kwargs, **error_info}
-                )
-                
-                # 记录日志
-                _log_error(custom_error, log_level)
-                
-                # 重新抛出异常
-                if reraise:
-                    raise custom_error from e
-                    
-                return None
-                
-        @functools.wraps(func)
-        def sync_wrapper(*args, **kw) -> Any:
-            try:
-                return func(*args, **kw)
-            except Exception as e:
-                # 获取错误信息
-                error_info = _get_error_info(e)
-                
-                # 创建自定义异常
-                custom_error = error_type(
-                    message=str(e),
-                    details={**kwargs, **error_info}
-                )
-                
-                # 记录日志
-                _log_error(custom_error, log_level)
-                
-                # 重新抛出异常
-                if reraise:
-                    raise custom_error from e
-                    
-                return None
-                
-        return async_wrapper if asyncio.iscoroutinefunction(func) else sync_wrapper
-    return decorator
 
-def _get_error_info(error: Exception) -> Dict[str, Any]:
-    """获取错误信息
-    
-    Args:
-        error: 异常对象
-    
-    Returns:
-        Dict[str, Any]: 错误信息字典
-    """
-    return {
-        "error_type": error.__class__.__name__,
-        "traceback": traceback.format_exc(),
-        "timestamp": datetime.now().isoformat()
-    }
+class BaseError(Exception):
+    """基础错误类。"""
 
-def _log_error(
-    error: CrawlerException,
-    level: str = "error"
-) -> None:
-    """记录错误日志
-    
+    def __init__(
+        self,
+        message: str,
+        code: str = "UNKNOWN_ERROR",
+        status_code: int = status.HTTP_500_INTERNAL_SERVER_ERROR,
+        details: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """初始化错误。
+
+        Args:
+            message: 错误消息
+            code: 错误代码
+            status_code: HTTP状态码
+            details: 错误详情
+        """
+        super().__init__(message)
+        self.message = message
+        self.code = code
+        self.status_code = status_code
+        self.details = details or {}
+
+
+class ValidationError(BaseError):
+    """验证错误。"""
+
+    def __init__(
+        self,
+        message: str,
+        details: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """初始化验证错误。
+
+        Args:
+            message: 错误消息
+            details: 错误详情
+        """
+        super().__init__(
+            message=message,
+            code="VALIDATION_ERROR",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            details=details,
+        )
+
+
+class AuthenticationError(BaseError):
+    """认证错误。"""
+
+    def __init__(
+        self,
+        message: str = "Authentication failed",
+        details: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """初始化认证错误。
+
+        Args:
+            message: 错误消息
+            details: 错误详情
+        """
+        super().__init__(
+            message=message,
+            code="AUTHENTICATION_ERROR",
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            details=details,
+        )
+
+
+class AuthorizationError(BaseError):
+    """授权错误。"""
+
+    def __init__(
+        self,
+        message: str = "Permission denied",
+        details: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """初始化授权错误。
+
+        Args:
+            message: 错误消息
+            details: 错误详情
+        """
+        super().__init__(
+            message=message,
+            code="AUTHORIZATION_ERROR",
+            status_code=status.HTTP_403_FORBIDDEN,
+            details=details,
+        )
+
+
+class NotFoundError(BaseError):
+    """资源不存在错误。"""
+
+    def __init__(
+        self,
+        message: str = "Resource not found",
+        details: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """初始化资源不存在错误。
+
+        Args:
+            message: 错误消息
+            details: 错误详情
+        """
+        super().__init__(
+            message=message,
+            code="NOT_FOUND_ERROR",
+            status_code=status.HTTP_404_NOT_FOUND,
+            details=details,
+        )
+
+
+class ConflictError(BaseError):
+    """资源冲突错误。"""
+
+    def __init__(
+        self,
+        message: str = "Resource conflict",
+        details: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """初始化资源冲突错误。
+
+        Args:
+            message: 错误消息
+            details: 错误详情
+        """
+        super().__init__(
+            message=message,
+            code="CONFLICT_ERROR",
+            status_code=status.HTTP_409_CONFLICT,
+            details=details,
+        )
+
+
+class RateLimitError(BaseError):
+    """请求频率限制错误。"""
+
+    def __init__(
+        self,
+        message: str = "Too many requests",
+        details: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """初始化请求频率限制错误。
+
+        Args:
+            message: 错误消息
+            details: 错误详情
+        """
+        super().__init__(
+            message=message,
+            code="RATE_LIMIT_ERROR",
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            details=details,
+        )
+
+
+class DatabaseError(BaseError):
+    """数据库错误。"""
+
+    def __init__(
+        self,
+        message: str = "Database error",
+        details: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """初始化数据库错误。
+
+        Args:
+            message: 错误消息
+            details: 错误详情
+        """
+        super().__init__(
+            message=message,
+            code="DATABASE_ERROR",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            details=details,
+        )
+
+
+class CrawlerError(BaseError):
+    """爬虫错误。"""
+
+    def __init__(
+        self,
+        message: str = "Crawler error",
+        details: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """初始化爬虫错误。
+
+        Args:
+            message: 错误消息
+            details: 错误详情
+        """
+        super().__init__(
+            message=message,
+            code="CRAWLER_ERROR",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            details=details,
+        )
+
+
+class ProcessorError(BaseError):
+    """处理器错误。"""
+
+    def __init__(
+        self,
+        message: str = "Processor error",
+        details: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """初始化处理器错误。
+
+        Args:
+            message: 错误消息
+            details: 错误详情
+        """
+        super().__init__(
+            message=message,
+            code="PROCESSOR_ERROR",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            details=details,
+        )
+
+
+class StorageError(BaseError):
+    """存储错误。"""
+
+    def __init__(
+        self,
+        message: str = "Storage error",
+        details: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """初始化存储错误。
+
+        Args:
+            message: 错误消息
+            details: 错误详情
+        """
+        super().__init__(
+            message=message,
+            code="STORAGE_ERROR",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            details=details,
+        )
+
+
+class ThirdPartyError(BaseError):
+    """第三方服务错误。"""
+
+    def __init__(
+        self,
+        message: str = "Third party service error",
+        details: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """初始化第三方服务错误。
+
+        Args:
+            message: 错误消息
+            details: 错误详情
+        """
+        super().__init__(
+            message=message,
+            code="THIRD_PARTY_ERROR",
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            details=details,
+        )
+
+
+async def error_handler(
+    request: Request,
+    exc: Union[BaseError, HTTPException, Exception],
+) -> JSONResponse:
+    """统一错误处理器。
+
     Args:
-        error: 异常对象
-        level: 日志级别
+        request: 请求对象
+        exc: 异常对象
+
+    Returns:
+        JSONResponse: JSON响应
     """
-    log_func = getattr(logger, level)
-    log_func(
-        f"{error}\n"
-        f"Details: {error.details}\n"
-        f"Traceback: {error.details.get('traceback')}"
+    if isinstance(exc, BaseError):
+        error_response = {
+            "error": {
+                "code": exc.code,
+                "message": exc.message,
+                "details": exc.details,
+            }
+        }
+        status_code = exc.status_code
+    elif isinstance(exc, HTTPException):
+        error_response = {
+            "error": {
+                "code": "HTTP_ERROR",
+                "message": exc.detail,
+                "details": {},
+            }
+        }
+        status_code = exc.status_code
+    else:
+        error_response = {
+            "error": {
+                "code": "INTERNAL_SERVER_ERROR",
+                "message": str(exc),
+                "details": {},
+            }
+        }
+        status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+
+    # 记录错误日志
+    logger.error(
+        f"Error occurred while processing request",
+        extra={
+            "error_response": error_response,
+            "status_code": status_code,
+            "request_method": request.method,
+            "request_url": str(request.url),
+            "client_host": request.client.host if request.client else None,
+        },
     )
 
-class ErrorHandler:
-    """错误处理器"""
-    
-    def __init__(self):
-        """初始化错误处理器"""
-        self.errors: List[Dict[str, Any]] = []
-        self.max_errors = 1000  # 最多保存1000条错误记录
-        
-    def add_error(
-        self,
-        error: CrawlerException,
-        context: Optional[Dict[str, Any]] = None
-    ) -> None:
-        """添加错误记录
-        
-        Args:
-            error: 异常对象
-            context: 上下文信息
-        """
-        error_info = {
-            "code": error.code,
-            "message": error.message,
-            "details": error.details,
-            "context": context or {},
-            "timestamp": datetime.now().isoformat()
-        }
-        
-        self.errors.append(error_info)
-        
-        # 如果错误记录超过最大数量，删除最早的记录
-        if len(self.errors) > self.max_errors:
-            self.errors = self.errors[-self.max_errors:]
-            
-    def get_errors(
-        self,
-        error_type: Optional[str] = None,
-        start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None,
-        limit: int = 100
-    ) -> List[Dict[str, Any]]:
-        """获取错误记录
-        
-        Args:
-            error_type: 错误类型
-            start_time: 开始时间
-            end_time: 结束时间
-            limit: 返回数量限制
-            
-        Returns:
-            List[Dict[str, Any]]: 错误记录列表
-        """
-        filtered_errors = self.errors
-        
-        # 按错误类型过滤
-        if error_type:
-            filtered_errors = [
-                e for e in filtered_errors
-                if e["code"] == error_type
-            ]
-            
-        # 按时间范围过滤
-        if start_time:
-            filtered_errors = [
-                e for e in filtered_errors
-                if datetime.fromisoformat(e["timestamp"]) >= start_time
-            ]
-            
-        if end_time:
-            filtered_errors = [
-                e for e in filtered_errors
-                if datetime.fromisoformat(e["timestamp"]) <= end_time
-            ]
-            
-        # 返回最新的记录
-        return filtered_errors[-limit:]
-        
-    def clear_errors(self) -> None:
-        """清空错误记录"""
-        self.errors = []
-        
-    def get_error_stats(self) -> Dict[str, Any]:
-        """获取错误统计信息
-        
-        Returns:
-            Dict[str, Any]: 统计信息
-        """
-        stats = {
-            "total": len(self.errors),
-            "by_type": {},
-            "by_hour": {}
-        }
-        
-        # 按类型统计
-        for error in self.errors:
-            error_type = error["code"]
-            stats["by_type"][error_type] = stats["by_type"].get(error_type, 0) + 1
-            
-        # 按小时统计
-        now = datetime.now()
-        for error in self.errors:
-            error_time = datetime.fromisoformat(error["timestamp"])
-            if (now - error_time).total_seconds() <= 3600:  # 一小时内
-                hour = error_time.strftime("%Y-%m-%d %H:00:00")
-                stats["by_hour"][hour] = stats["by_hour"].get(hour, 0) + 1
-                
-        return stats 
+    return JSONResponse(
+        status_code=status_code,
+        content=error_response,
+    )
+
+
+def register_error_handlers(app: Any) -> None:
+    """注册错误处理器。
+
+    Args:
+        app: FastAPI应用实例
+    """
+    app.add_exception_handler(BaseError, error_handler)
+    app.add_exception_handler(HTTPException, error_handler)
+    app.add_exception_handler(Exception, error_handler) 

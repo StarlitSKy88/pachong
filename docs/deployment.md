@@ -2,298 +2,320 @@
 
 ## 系统要求
 
-- Python 3.10+
-- MongoDB 4.4+
-- Redis 6.0+（可选，用于缓存）
+### 硬件要求
+- CPU: 2核心及以上
+- 内存: 4GB及以上
+- 磁盘: 20GB及以上
 
-## 安装步骤
+### 软件要求
+- Python 3.8+
+- PostgreSQL 12+
+- Redis 6+
+- Chrome/Chromium (用于网页渲染)
 
-1. 克隆代码
+## 环境准备
+
+### 1. 安装系统依赖
+
+```bash
+# Ubuntu/Debian
+sudo apt-get update
+sudo apt-get install -y python3-pip python3-venv postgresql redis-server chromium-browser
+
+# CentOS/RHEL
+sudo yum update
+sudo yum install -y python3-pip python3-venv postgresql redis chromium
+```
+
+### 2. 创建数据库
+
+```bash
+# 登录PostgreSQL
+sudo -u postgres psql
+
+# 创建数据库和用户
+CREATE DATABASE content_crawler;
+CREATE USER crawler WITH PASSWORD 'your_password';
+GRANT ALL PRIVILEGES ON DATABASE content_crawler TO crawler;
+```
+
+### 3. 配置Redis
+
+```bash
+# 编辑Redis配置
+sudo vim /etc/redis/redis.conf
+
+# 设置密码（可选）
+requirepass your_redis_password
+
+# 重启Redis服务
+sudo systemctl restart redis
+```
+
+## 应用部署
+
+### 1. 获取代码
+
 ```bash
 git clone https://github.com/yourusername/content-crawler.git
 cd content-crawler
 ```
 
-2. 创建虚拟环境
+### 2. 创建虚拟环境
+
 ```bash
 python -m venv venv
 source venv/bin/activate  # Linux/Mac
 venv\Scripts\activate  # Windows
 ```
 
-3. 安装依赖
+### 3. 安装依赖
+
 ```bash
 pip install -r requirements.txt
 ```
 
-4. 配置环境变量
+### 4. 配置环境变量
+
 ```bash
-cp examples/config.env .env
-# 编辑.env文件，填入必要的配置信息
-```
+# 复制环境变量模板
+cp .env.example .env
 
-## 配置说明
+# 编辑环境变量
+vim .env
 
-### 数据库配置
+# 配置必要的参数
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=content_crawler
+DB_USER=crawler
+DB_PASSWORD=your_password
 
-```env
-# MongoDB配置
-MONGODB_URI=mongodb://localhost:27017/
-MONGODB_DB=crawler_db
-
-# Redis配置（可选）
 REDIS_HOST=localhost
 REDIS_PORT=6379
-REDIS_DB=0
+REDIS_PASSWORD=your_redis_password
+
+# API密钥配置
+OPENAI_API_KEY=your_openai_key
+ANTHROPIC_API_KEY=your_anthropic_key
 ```
 
-### 代理配置
+### 5. 初始化数据库
 
-```env
-# 代理配置
-PROXY_API_URL=http://localhost:5555/get_all
-PROXY_MIN_SCORE=60
-PROXY_MAX_SCORE=100
-PROXY_CHECK_INTERVAL=300
-```
-
-### Cookie配置
-
-```env
-# Cookie配置
-COOKIE_FILE_PATH=./data/cookies.json
-COOKIE_MIN_SCORE=60
-COOKIE_MAX_SCORE=100
-COOKIE_CHECK_INTERVAL=300
-COOKIE_MIN_COUNT=5
-```
-
-### 监控配置
-
-```env
-# 监控配置
-MONITOR_CHECK_INTERVAL=60
-ALERT_WEBHOOK=https://your-webhook-url/alert
-```
-
-### 爬虫配置
-
-```env
-# 爬虫配置
-CRAWLER_CONCURRENCY=3
-CRAWLER_RETRY_TIMES=3
-CRAWLER_TIMEOUT=30
-REQUEST_DELAY=1
-```
-
-### 日志配置
-
-```env
-# 日志配置
-LOG_LEVEL=INFO
-LOG_FILE=./logs/crawler.log
-```
-
-## 目录结构
-
-```
-content-crawler/
-├── src/                # 源代码目录
-│   ├── crawlers/      # 爬虫实现
-│   ├── database/      # 数据存储
-│   ├── models/        # 数据模型
-│   ├── monitor/       # 监控系统
-│   └── utils/         # 工具函数
-├── examples/          # 使用示例
-├── tests/             # 测试用例
-├── docs/              # 文档
-├── data/              # 数据目录
-│   ├── cookies.json   # Cookie文件
-│   └── exports/       # 导出目录
-├── logs/              # 日志目录
-├── requirements.txt   # 项目依赖
-└── README.md         # 项目说明
-```
-
-## 部署方式
-
-### 1. 直接部署
-
-适用于开发环境或小规模部署。
-
-1. 安装依赖
 ```bash
-pip install -r requirements.txt
+# 创建数据库表
+alembic upgrade head
 ```
 
-2. 启动MongoDB
+### 6. 启动服务
+
+#### 开发环境
+
 ```bash
-mongod --dbpath /path/to/data/db
+# 启动应用
+python -m src.cli run
 ```
 
-3. 运行爬虫
+#### 生产环境
+
+1. 使用Supervisor管理进程
+
 ```bash
-python examples/crawler_example.py
+# 安装supervisor
+sudo apt-get install supervisor
+
+# 创建配置文件
+sudo vim /etc/supervisor/conf.d/content-crawler.conf
 ```
 
-### 2. Docker部署
+配置文件内容：
+```ini
+[program:content-crawler]
+directory=/path/to/content-crawler
+command=/path/to/content-crawler/venv/bin/python -m src.cli run
+user=www-data
+autostart=true
+autorestart=true
+stderr_logfile=/var/log/content-crawler/err.log
+stdout_logfile=/var/log/content-crawler/out.log
+environment=
+    PYTHONPATH="/path/to/content-crawler",
+    ENV="production"
+```
 
-适用于生产环境部署。
-
-1. 构建镜像
 ```bash
-docker build -t content-crawler .
+# 创建日志目录
+sudo mkdir -p /var/log/content-crawler
+sudo chown www-data:www-data /var/log/content-crawler
+
+# 重新加载supervisor配置
+sudo supervisorctl reread
+sudo supervisorctl update
 ```
 
-2. 运行容器
+2. 配置Nginx反向代理
+
 ```bash
-docker run -d \
-    --name content-crawler \
-    -v $(pwd)/data:/app/data \
-    -v $(pwd)/logs:/app/logs \
-    --env-file .env \
-    content-crawler
+# 安装nginx
+sudo apt-get install nginx
+
+# 创建配置文件
+sudo vim /etc/nginx/sites-available/content-crawler
 ```
 
-### 3. Docker Compose部署
+配置文件内容：
+```nginx
+server {
+    listen 80;
+    server_name your_domain.com;
 
-适用于完整的服务部署。
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+```
 
-1. 创建docker-compose.yml
+```bash
+# 启用站点
+sudo ln -s /etc/nginx/sites-available/content-crawler /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl restart nginx
+```
+
+## 监控配置
+
+### 1. 配置Prometheus
+
+```bash
+# 安装Prometheus
+sudo apt-get install prometheus
+
+# 编辑配置文件
+sudo vim /etc/prometheus/prometheus.yml
+```
+
+添加配置：
 ```yaml
-version: '3'
-
-services:
-  crawler:
-    build: .
-    volumes:
-      - ./data:/app/data
-      - ./logs:/app/logs
-    env_file:
-      - .env
-    depends_on:
-      - mongodb
-      - redis
-      
-  mongodb:
-    image: mongo:4.4
-    volumes:
-      - ./data/db:/data/db
-    ports:
-      - "27017:27017"
-      
-  redis:
-    image: redis:6.0
-    volumes:
-      - ./data/redis:/data
-    ports:
-      - "6379:6379"
+scrape_configs:
+  - job_name: 'content-crawler'
+    static_configs:
+      - targets: ['localhost:9090']
 ```
 
-2. 启动服务
+### 2. 配置Grafana
+
 ```bash
-docker-compose up -d
+# 安装Grafana
+sudo apt-get install grafana
+
+# 启动服务
+sudo systemctl start grafana-server
 ```
 
-## 监控和维护
+访问 `http://your_domain:3000` 配置数据源和仪表盘。
 
-### 1. 日志查看
+## 备份策略
 
+### 1. 数据库备份
+
+创建备份脚本 `backup.sh`：
 ```bash
-# 查看应用日志
-tail -f logs/crawler.log
-
-# 查看错误日志
-grep ERROR logs/crawler.log
+#!/bin/bash
+BACKUP_DIR="/path/to/backups"
+DATE=$(date +%Y%m%d_%H%M%S)
+pg_dump content_crawler > "$BACKUP_DIR/db_backup_$DATE.sql"
 ```
 
-### 2. 数据备份
-
+配置定时任务：
 ```bash
-# 备份MongoDB
-mongodump --out backup/$(date +%Y%m%d)
+# 编辑crontab
+crontab -e
 
-# 备份Cookie文件
-cp data/cookies.json backup/cookies_$(date +%Y%m%d).json
+# 添加每日备份任务
+0 2 * * * /path/to/backup.sh
 ```
 
-### 3. 监控指标
+### 2. 日志备份
 
-可以通过以下方式查看监控指标：
-
-1. 日志文件
-2. 监控接口
-3. 告警通知
-
-### 4. 常见问题
-
-1. 代理不可用
-   - 检查代理API是否可访问
-   - 检查代理质量分数
-   - 更新代理池
-
-2. Cookie失效
-   - 检查Cookie有效性
-   - 更新Cookie池
-   - 增加Cookie数量
-
-3. 请求失败
-   - 检查网络连接
-   - 检查请求参数
-   - 调整并发数量
-
-4. 内存占用过高
-   - 检查内存泄漏
-   - 调整批量大小
-   - 增加清理任务
-
-## 升级和回滚
-
-### 1. 升级步骤
-
-1. 备份数据
+配置logrotate：
 ```bash
-./scripts/backup.sh
+# 创建配置文件
+sudo vim /etc/logrotate.d/content-crawler
 ```
 
-2. 更新代码
-```bash
-git pull origin main
+配置内容：
+```
+/var/log/content-crawler/*.log {
+    daily
+    rotate 14
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0640 www-data www-data
+}
 ```
 
-3. 更新依赖
+## 更新部署
+
+### 1. 代码更新
+
 ```bash
+# 进入项目目录
+cd /path/to/content-crawler
+
+# 拉取最新代码
+git pull
+
+# 激活虚拟环境
+source venv/bin/activate
+
+# 更新依赖
 pip install -r requirements.txt
+
+# 执行数据库迁移
+alembic upgrade head
+
+# 重启服务
+sudo supervisorctl restart content-crawler
 ```
 
-4. 重启服务
+### 2. 配置更新
+
 ```bash
-docker-compose restart
+# 更新环境变量
+vim .env
+
+# 更新平台配置
+vim config/xiaohongshu.json
+vim config/bilibili.json
+
+# 重启服务
+sudo supervisorctl restart content-crawler
 ```
 
-### 2. 回滚步骤
+## 故障处理
 
-1. 切换版本
-```bash
-git checkout <version>
-```
+### 1. 服务无法启动
+- 检查日志文件
+- 验证环境变量配置
+- 确认数据库连接
+- 检查端口占用
 
-2. 恢复数据
-```bash
-./scripts/restore.sh <backup_date>
-```
+### 2. 数据库连接失败
+- 检查数据库服务状态
+- 验证连接参数
+- 检查防火墙设置
 
-3. 重启服务
-```bash
-docker-compose restart
-```
+### 3. 爬虫异常
+- 检查代理配置
+- 验证Cookie有效性
+- 检查IP是否被封禁
 
-## 安全建议
-
-1. 使用环境变量管理敏感信息
-2. 定期更新依赖版本
-3. 限制API访问频率
-4. 加密敏感数据
-5. 定期备份数据
-6. 监控异常访问
-7. 使用HTTPS传输
+### 4. 性能问题
+- 检查系统资源使用
+- 优化数据库查询
+- 调整并发参数
+- 检查内存泄漏

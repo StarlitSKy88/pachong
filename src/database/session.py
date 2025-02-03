@@ -71,4 +71,41 @@ async def get_session() -> AsyncSession:
     """
     if async_session_factory is None:
         raise RuntimeError("数据库未初始化")
-    return async_session_factory() 
+    return async_session_factory()
+
+"""数据库会话管理"""
+from typing import AsyncGenerator
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.orm import sessionmaker
+
+from src.config import get_database_config
+from .base import Base
+
+# 获取数据库配置
+db_config = get_database_config()
+
+# 创建异步引擎
+engine = create_async_engine(
+    db_config['sqlite']['url'].replace('sqlite://', 'sqlite+aiosqlite://'),
+    echo=db_config['sqlite'].get('echo', False)
+)
+
+# 创建会话工厂
+async_session_factory = sessionmaker(
+    engine,
+    class_=AsyncSession,
+    expire_on_commit=False
+)
+
+async def init_db():
+    """初始化数据库"""
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+async def get_session() -> AsyncGenerator[AsyncSession, None]:
+    """获取数据库会话"""
+    async with async_session_factory() as session:
+        try:
+            yield session
+        finally:
+            await session.close() 

@@ -154,3 +154,60 @@ data/reports/*
 # Development configs
 config/dev/*
 !config/dev/.gitkeep
+
+# Project specific
+.env
+*.log
+logs/
+data/
+.coverage
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+
+# Database
+*.db
+*.sqlite3
+
+# Cache
+.cache/
+
+# Logs
+logs/
+*.log
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Test coverage
+.coverage
+htmlcov/
+.tox/
+.nox/
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+
+# Project specific
+storage/
+temp/
+*.bak
+*.tmp
+*.old
+
+# System
+.DS_Store
+Thumbs.db
+
+# Project specific
+config/*.json
+!config/*.example.json
+output/
+data/
+*.pid
+*.socket

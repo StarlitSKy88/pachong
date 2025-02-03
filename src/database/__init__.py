@@ -1,4 +1,6 @@
-"""数据库包"""
+"""
+Database models and operations
+"""
 
 from .session import async_session_factory as Session
 from .session import engine, init_database, get_session, get_db

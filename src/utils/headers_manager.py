@@ -5,40 +5,45 @@ import os
 class HeadersManager:
     """请求头管理器"""
 
+    USER_AGENTS = [
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.159 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.82 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.81 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/95.0.4638.69 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.45 Safari/537.36",
+    ]
+
     def __init__(self):
         """初始化请求头管理器"""
-        self.user_agents = [
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0",
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.3.1 Safari/605.1.15",
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 Edg/122.0.0.0"
-        ]
+        self.headers = {}
 
-    def get_headers(self) -> Dict[str, str]:
-        """获取请求头
+    def get_random_ua(self) -> str:
+        """获取随机User-Agent"""
+        return random.choice(self.USER_AGENTS)
 
-        Returns:
-            请求头字典
-        """
-        return {
-            "User-Agent": random.choice(self.user_agents),
-            "Accept": "application/json, text/plain, */*",
-            "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
-            "Accept-Encoding": "gzip, deflate, br",
-            "Connection": "keep-alive",
-            "Cache-Control": "no-cache",
-            "Pragma": "no-cache",
-            "Sec-Ch-Ua": '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
-            "Sec-Ch-Ua-Mobile": "?0",
-            "Sec-Ch-Ua-Platform": '"Windows"',
-            "Sec-Fetch-Dest": "empty",
-            "Sec-Fetch-Mode": "cors",
-            "Sec-Fetch-Site": "same-origin",
-            "X-Requested-With": "XMLHttpRequest"
+    def get_headers(self, platform: str = None) -> Dict[str, str]:
+        """获取请求头"""
+        headers = {
+            'User-Agent': self.get_random_ua(),
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive'
         }
+        
+        if platform == 'xhs':
+            headers.update({
+                'Origin': 'https://www.xiaohongshu.com',
+                'Referer': 'https://www.xiaohongshu.com'
+            })
+        elif platform == 'bilibili':
+            headers.update({
+                'Origin': 'https://www.bilibili.com',
+                'Referer': 'https://www.bilibili.com'
+            })
+        
+        return headers
 
     async def initialize(self):
         """初始化"""
@@ -46,7 +51,7 @@ class HeadersManager:
         
     def rotate_user_agent(self):
         """轮换User-Agent"""
-        self.headers['User-Agent'] = random.choice(self.user_agents)
+        self.headers['User-Agent'] = random.choice(self.USER_AGENTS)
         
     def update_headers(self, headers: Dict[str, str]):
         """更新请求头

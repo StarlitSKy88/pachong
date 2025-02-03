@@ -10,37 +10,164 @@ import asyncio
 import random
 
 class BiliBiliCrawler(BaseCrawler):
-    """B站爬虫类"""
+    """B站爬虫"""
     
-    def __init__(
-        self,
-        concurrent_limit: int = 3,  # B站对并发要求较严格
-        retry_limit: int = 3,
-        timeout: int = 30
-    ):
-        """初始化爬虫
+    def __init__(self, timeout: int = 30, proxy: str = None):
+        super().__init__(timeout, proxy)
+        self.base_url = "https://www.bilibili.com"
+        self.api_base = "https://api.bilibili.com"
+        self.headers.update({
+            'Origin': 'https://www.bilibili.com',
+            'Referer': 'https://www.bilibili.com',
+            'Content-Type': 'application/json;charset=UTF-8'
+        })
+    
+    async def search(self, keyword: str, time_range: str, limit: int) -> List[Dict[str, Any]]:
+        """搜索视频"""
+        results = []
+        page = 1
+        page_size = 20
         
-        Args:
-            concurrent_limit: 并发限制
-            retry_limit: 重试次数限制
-            timeout: 超时时间（秒）
-        """
-        super().__init__(
-            platform="bilibili",
-            concurrent_limit=concurrent_limit,
-            retry_limit=retry_limit,
-            timeout=timeout
-        )
+        while len(results) < limit:
+            try:
+                # 构造搜索参数
+                params = {
+                    "keyword": keyword,
+                    "page": page,
+                    "pagesize": page_size,
+                    "order": "pubdate",  # 按发布时间排序
+                    "search_type": "video",
+                    "tids": 0,  # 全部分区
+                    "duration": 0  # 全部时长
+                }
+                
+                # 发送请求
+                url = f"{self.api_base}/x/web-interface/search/type"
+                response = await self._get(url, params)
+                
+                if not response.get('data', {}).get('result'):
+                    break
+                
+                # 解析结果
+                items = []
+                for video in response['data']['result']:
+                    try:
+                        pub_time = datetime.fromtimestamp(video['pubdate'])
+                        item = {
+                            'platform': 'bilibili',
+                            'id': str(video['aid']),
+                            'bvid': video['bvid'],
+                            'title': video['title'],
+                            'content': video.get('description', ''),
+                            'author': video['author'],
+                            'author_id': str(video['mid']),
+                            'publish_time': pub_time.isoformat(),
+                            'duration': video['duration'],
+                            'likes': video.get('like', 0),
+                            'views': video.get('play', 0),
+                            'comments': video.get('review', 0),
+                            'url': f"{self.base_url}/video/{video['bvid']}",
+                            'cover': video.get('pic', ''),
+                            'type': 'video'
+                        }
+                        items.append(item)
+                    except Exception as e:
+                        self.logger.error(f"解析视频失败: {str(e)}")
+                        continue
+                
+                # 按时间过滤
+                filtered_items = self.filter_by_time(items, time_range)
+                results.extend(filtered_items)
+                
+                # 检查是否需要继续
+                if len(response['data']['result']) < page_size:
+                    break
+                    
+                page += 1
+                
+                # 添加随机延迟
+                await asyncio.sleep(random.uniform(1, 3))
+                
+            except Exception as e:
+                self.logger.error(f"搜索失败: {str(e)}")
+                break
         
-        # API接口
-        self.search_api = "https://api.bilibili.com/x/web-interface/search/type"
-        self.video_api = "https://api.bilibili.com/x/web-interface/view"
-        self.user_api = "https://api.bilibili.com/x/space/acc/info"
-        self.stat_api = "https://api.bilibili.com/x/web-interface/archive/stat"
-        self.reply_api = "https://api.bilibili.com/x/v2/reply"
-        
-        # 初始化特定的指标
-        self._init_platform_metrics()
+        return results[:limit]
+    
+    async def get_detail(self, item_id: str) -> Dict[str, Any]:
+        """获取视频详情"""
+        try:
+            # 获取视频信息
+            url = f"{self.api_base}/x/web-interface/view"
+            params = {"aid": item_id}
+            response = await self._get(url, params)
+            video = response['data']
+            
+            # 获取视频统计信息
+            stat_url = f"{self.api_base}/x/web-interface/archive/stat"
+            stat_response = await self._get(stat_url, params)
+            stat = stat_response['data']
+            
+            pub_time = datetime.fromtimestamp(video['pubdate'])
+            return {
+                'platform': 'bilibili',
+                'id': str(video['aid']),
+                'bvid': video['bvid'],
+                'title': video['title'],
+                'content': video['desc'],
+                'author': video['owner']['name'],
+                'author_id': str(video['owner']['mid']),
+                'publish_time': pub_time.isoformat(),
+                'duration': video['duration'],
+                'likes': stat['like'],
+                'views': stat['view'],
+                'comments': stat['reply'],
+                'coins': stat['coin'],
+                'favorites': stat['favorite'],
+                'shares': stat['share'],
+                'url': f"{self.base_url}/video/{video['bvid']}",
+                'cover': video['pic'],
+                'type': 'video',
+                'tags': [tag['tag_name'] for tag in video.get('tags', [])],
+                'comments_data': await self._get_comments(item_id)
+            }
+            
+        except Exception as e:
+            self.logger.error(f"获取视频详情失败: {str(e)}")
+            raise
+    
+    async def _get_comments(self, item_id: str, limit: int = 20) -> List[Dict]:
+        """获取评论"""
+        try:
+            url = f"{self.api_base}/x/v2/reply"
+            params = {
+                "type": 1,  # 视频评论
+                "oid": item_id,
+                "pn": 1,
+                "ps": limit,
+                "sort": 2  # 按时间排序
+            }
+            
+            response = await self._get(url, params)
+            
+            comments = []
+            for reply in response['data']['replies'][:limit]:
+                pub_time = datetime.fromtimestamp(reply['ctime'])
+                comments.append({
+                    'id': str(reply['rpid']),
+                    'content': reply['content']['message'],
+                    'user': reply['member']['uname'],
+                    'user_id': str(reply['member']['mid']),
+                    'time': pub_time.isoformat(),
+                    'likes': reply['like'],
+                    'replies': reply['rcount']
+                })
+            
+            return comments
+            
+        except Exception as e:
+            self.logger.error(f"获取评论失败: {str(e)}")
+            return []
         
     def _init_platform_metrics(self):
         """初始化平台特定的指标"""
@@ -110,125 +237,6 @@ class BiliBiliCrawler(BaseCrawler):
         else:
             start_time = now - timedelta(days=1)
         return int(start_time.timestamp())
-        
-    async def search(
-        self,
-        keyword: str,
-        page: int = 1,
-        order: str = "pubdate"
-    ) -> Dict[str, Any]:
-        """搜索视频
-        
-        Args:
-            keyword: 搜索关键词
-            page: 页码
-            order: 排序方式（pubdate/click/stow）
-            
-        Returns:
-            Dict[str, Any]: 搜索结果
-        """
-        params = {
-            "search_type": "video",
-            "keyword": keyword,
-            "page": page,
-            "order": order,
-            "duration": 0,
-            "tids": 0
-        }
-        
-        return await self._request(
-            self.search_api,
-            method="GET",
-            params=params
-        )
-        
-    async def get_video_info(self, bvid: str) -> Dict[str, Any]:
-        """获取视频信息
-        
-        Args:
-            bvid: 视频BV号
-            
-        Returns:
-            Dict[str, Any]: 视频信息
-        """
-        params = {"bvid": bvid}
-        return await self._request(
-            self.video_api,
-            method="GET",
-            params=params
-        )
-        
-    async def get_video_stat(self, bvid: str) -> Dict[str, Any]:
-        """获取视频统计信息
-        
-        Args:
-            bvid: 视频BV号
-            
-        Returns:
-            Dict[str, Any]: 统计信息
-        """
-        params = {"bvid": bvid}
-        return await self._request(
-            self.stat_api,
-            method="GET",
-            params=params
-        )
-        
-    async def get_replies(
-        self,
-        oid: int,
-        page: int = 1,
-        type: int = 1
-    ) -> Dict[str, Any]:
-        """获取评论
-        
-        Args:
-            oid: 视频aid
-            page: 页码
-            type: 评论类型（1：视频）
-            
-        Returns:
-            Dict[str, Any]: 评论数据
-        """
-        params = {
-            "oid": oid,
-            "pn": page,
-            "type": type,
-            "sort": 2
-        }
-        return await self._request(
-            self.reply_api,
-            method="GET",
-            params=params
-        )
-        
-    def calculate_quality_score(self, data: Dict[str, Any]) -> float:
-        """计算视频质量分数
-        
-        Args:
-            data: 视频数据
-            
-        Returns:
-            float: 质量分数（0-100）
-        """
-        stat = data["stat"]
-        
-        # 计算互动率
-        view_count = max(stat["view"], 1)
-        interaction_rate = (
-            stat["like"] + stat["coin"] + stat["favorite"]
-        ) / view_count
-        
-        # 计算评论率
-        comment_rate = stat["reply"] / view_count
-        
-        # 计算总分
-        score = (
-            interaction_rate * 60 +  # 互动占60%
-            comment_rate * 40    # 评论占40%
-        ) * 100
-        
-        return min(score, 100)  # 限制最高分为100
         
     async def parse(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """解析数据
@@ -339,20 +347,20 @@ class BiliBiliCrawler(BaseCrawler):
                     # 搜索视频
                     search_result = await self.search(
                         keyword=keyword,
-                        page=page
+                        time_range=time_range,
+                        limit=limit
                     )
                     
-                    videos = search_result.get("data", {}).get("result", [])
-                    if not videos:
+                    if not search_result:
                         break
                         
-                    for video in videos:
+                    for video in search_result:
                         # 检查时间范围
                         if video["pubdate"] < start_time:
                             continue
                             
                         # 获取视频详情
-                        video_detail = await self.get_video_info(video["bvid"])
+                        video_detail = await self.get_detail(video["id"])
                         
                         # 解析数据
                         parsed_data = await self.parse(video_detail)
@@ -367,14 +375,13 @@ class BiliBiliCrawler(BaseCrawler):
                         if len(results) >= limit:
                             break
                             
-                    page += 1
-                    
                 except Exception as e:
                     self.logger.error(
                         f"Crawl error: {str(e)}",
                         extra={
                             "keyword": keyword,
-                            "page": page
+                            "time_range": time_range,
+                            "limit": limit
                         }
                     )
                     continue
