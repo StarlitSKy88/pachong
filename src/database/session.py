@@ -11,21 +11,28 @@ from src.config import get_database_config
 async_session_factory: Optional[async_sessionmaker] = None
 engine = None
 
-def init_database(base):
+def init_database(base, is_test: bool = False):
     """初始化数据库
 
     Args:
         base: 数据库模型基类
+        is_test: 是否为测试环境
     """
     global async_session_factory, engine
     
     # 获取数据库配置
     config = get_database_config()
     
+    # 测试环境使用内存数据库
+    if is_test:
+        db_url = "sqlite+aiosqlite:///:memory:"
+    else:
+        db_url = config["sqlite"]["url"].replace('sqlite:///', 'sqlite+aiosqlite:///')
+    
     # 创建异步引擎
     engine = create_async_engine(
-        config["url"].replace('sqlite:///', 'sqlite+aiosqlite:///'),
-        **config.get("engine_kwargs", {})
+        db_url,
+        echo=config["sqlite"].get("echo", False)
     )
     
     # 创建异步会话工厂

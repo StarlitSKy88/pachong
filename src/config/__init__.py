@@ -1,4 +1,4 @@
 """配置包"""
-from .settings import settings
+from .settings import settings, get_database_config
 
-__all__ = ['settings'] 
+__all__ = ['settings', 'get_database_config'] 

@@ -14,6 +14,10 @@ class CookieManager:
     def __init__(self):
         self.cookies = {}
         self.cookie_file = "data/cookies.json"
+        self.request_intervals = {}  # 记录每个cookie的请求间隔
+        self.last_request_time = {}  # 记录每个cookie的最后请求时间
+        self.max_requests_per_day = 100  # 每个cookie每天最大请求次数
+        self.request_counts = {}  # 记录每个cookie的请求次数
         self.load_cookies()
 
     def load_cookies(self):
@@ -42,11 +46,57 @@ class CookieManager:
             self.cookies[platform].append(cookie)
             self.save_cookies()
 
-    def get_cookie(self, platform: str) -> Optional[str]:
-        """获取随机Cookie"""
-        if platform in self.cookies and self.cookies[platform]:
-            return random.choice(self.cookies[platform])
-        return None
+    async def get_cookie(self, platform: str) -> Optional[str]:
+        """获取可用的Cookie，包含频率控制"""
+        if platform not in self.cookies or not self.cookies[platform]:
+            return None
+            
+        # 获取所有可用的cookie
+        available_cookies = []
+        current_time = datetime.now()
+        
+        for cookie in self.cookies[platform]:
+            # 检查是否超过每日请求限制
+            if self.request_counts.get(cookie, 0) >= self.max_requests_per_day:
+                continue
+                
+            # 检查是否需要等待
+            last_time = self.last_request_time.get(cookie)
+            if last_time:
+                interval = self.request_intervals.get(cookie, 3)  # 默认3秒间隔
+                if (current_time - last_time).total_seconds() < interval:
+                    continue
+                    
+            available_cookies.append(cookie)
+            
+        if not available_cookies:
+            return None
+            
+        # 随机选择一个可用的cookie
+        selected_cookie = random.choice(available_cookies)
+        
+        # 更新请求记录
+        self.last_request_time[selected_cookie] = current_time
+        self.request_counts[selected_cookie] = self.request_counts.get(selected_cookie, 0) + 1
+        
+        return selected_cookie
+
+    def update_request_interval(self, cookie: str, success: bool):
+        """根据请求结果动态调整间隔"""
+        current_interval = self.request_intervals.get(cookie, 3)
+        
+        if success:
+            # 成功则缓慢减少间隔，最小2秒
+            new_interval = max(2, current_interval * 0.9)
+        else:
+            # 失败则显著增加间隔
+            new_interval = min(30, current_interval * 2)
+            
+        self.request_intervals[cookie] = new_interval
+
+    def reset_daily_counts(self):
+        """重置每日请求计数"""
+        self.request_counts.clear()
 
     def remove_cookie(self, platform: str, cookie: str):
         """移除Cookie"""

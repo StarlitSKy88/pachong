@@ -2,6 +2,7 @@
 import asyncio
 import os
 from datetime import datetime
+from pathlib import Path
 from loguru import logger
 
 from src.database.sqlite_storage import SQLiteStorage
@@ -9,26 +10,30 @@ from src.database.mongo_storage import MongoStorage
 from src.database.cache_storage import CacheStorage, CachedStorage
 from src.monitor.performance_monitor import PerformanceMonitor
 from src.monitor.business_monitor import BusinessMonitor
-from src.crawlers.base_crawler import BaseCrawler
+from src.config.settings import settings
 
 async def setup_storage():
     """初始化存储"""
     logger.info("初始化存储系统...")
     
+    # 创建数据目录
+    data_dir = Path(settings.BASE_DIR) / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    
     # SQLite存储
-    sqlite = SQLiteStorage('data/crawler.db')
+    sqlite = SQLiteStorage(str(data_dir / "crawler.db"))
     await sqlite.init()
     
     # MongoDB存储
     mongo = MongoStorage(
-        mongo_url='mongodb://localhost:27017',
-        database='crawler',
+        mongo_url=settings.MONGO_URL,
+        database=settings.MONGO_DB,
         collection='contents'
     )
     await mongo.init()
     
     # Redis缓存
-    cache = CacheStorage('redis://localhost')
+    cache = CacheStorage(settings.REDIS_URL)
     await cache.init()
     
     # 带缓存的存储
@@ -73,55 +78,64 @@ async def test_crawler(storage):
         'created_at': datetime.now()
     }
     
-    # 保存数据
-    success = await storage.save(test_data)
-    logger.info(f"保存测试数据: {'成功' if success else '失败'}")
-    
-    # 查询数据
-    saved_data = await storage.get(test_data['id'])
-    logger.info(f"查询数据: {saved_data is not None}")
-    
-    # 更新数据
-    test_data['content']['title'] = '更新的标题'
-    success = await storage.update(test_data['id'], test_data)
-    logger.info(f"更新数据: {'成功' if success else '失败'}")
-    
-    # 列出数据
-    items = await storage.list(
-        filter={'source': 'test'},
-        sort=[('created_at', 'DESC')],
-        limit=10
-    )
-    logger.info(f"查询到 {len(items)} 条数据")
-    
-    return True
+    try:
+        # 保存数据
+        success = await storage.save(test_data)
+        logger.info(f"保存测试数据: {'成功' if success else '失败'}")
+        
+        if success:
+            # 查询数据
+            saved_data = await storage.get(test_data['id'])
+            logger.info(f"查询数据: {saved_data is not None}")
+            
+            # 更新数据
+            test_data['content']['title'] = '更新的标题'
+            success = await storage.update(test_data['id'], test_data)
+            logger.info(f"更新数据: {'成功' if success else '失败'}")
+            
+            # 列出数据
+            items = await storage.list(
+                filter={'source': 'test'},
+                sort=[('created_at', 'DESC')],
+                limit=10
+            )
+            logger.info(f"查询到 {len(items)} 条数据")
+            
+            return True
+    except Exception as e:
+        logger.error(f"测试爬虫失败: {str(e)}")
+        return False
 
 async def test_monitor(perf_monitor, biz_monitor):
     """测试监控"""
     logger.info("开始监控测试...")
     
-    # 等待采集数据
-    await asyncio.sleep(10)
-    
-    # 检查性能指标
-    cpu_metrics = perf_monitor.get_metrics('cpu_percent')
-    memory_metrics = perf_monitor.get_metrics('memory_percent')
-    logger.info(f"CPU使用率: {cpu_metrics[-1].value if cpu_metrics else 'N/A'}%")
-    logger.info(f"内存使用率: {memory_metrics[-1].value if memory_metrics else 'N/A'}%")
-    
-    # 检查业务指标
-    stats = await biz_monitor.get_statistics()
-    logger.info(f"总数据量: {stats.get('total_count', 0)}")
-    logger.info(f"今日数据量: {stats.get('today_count', 0)}")
-    
-    # 检查告警
-    alerts = perf_monitor.get_alerts()
-    if alerts:
-        logger.warning(f"存在 {len(alerts)} 个告警")
-        for alert in alerts:
-            logger.warning(f"- [{alert.level}] {alert.name}: {alert.message}")
-            
-    return True
+    try:
+        # 等待采集数据
+        await asyncio.sleep(10)
+        
+        # 检查性能指标
+        cpu_metrics = perf_monitor.get_metrics('cpu_percent')
+        memory_metrics = perf_monitor.get_metrics('memory_percent')
+        logger.info(f"CPU使用率: {cpu_metrics[-1].value if cpu_metrics else 'N/A'}%")
+        logger.info(f"内存使用率: {memory_metrics[-1].value if memory_metrics else 'N/A'}%")
+        
+        # 检查业务指标
+        stats = await biz_monitor.get_statistics()
+        logger.info(f"总数据量: {stats.get('total_count', 0)}")
+        logger.info(f"今日数据量: {stats.get('today_count', 0)}")
+        
+        # 检查告警
+        alerts = perf_monitor.get_alerts()
+        if alerts:
+            logger.warning(f"存在 {len(alerts)} 个告警")
+            for alert in alerts:
+                logger.warning(f"- [{alert.level}] {alert.name}: {alert.message}")
+                
+        return True
+    except Exception as e:
+        logger.error(f"测试监控失败: {str(e)}")
+        return False
 
 async def main():
     """主测试流程"""

@@ -36,8 +36,8 @@ class Settings(BaseSettings):
     REDIS_PASSWORD: Optional[str] = Field(None, env="REDIS_PASSWORD")
 
     # LLM配置
-    OPENAI_API_KEY: str = Field(..., env="OPENAI_API_KEY")
-    ANTHROPIC_API_KEY: str = Field(..., env="ANTHROPIC_API_KEY")
+    OPENAI_API_KEY: str = Field("sk-dummy", env="OPENAI_API_KEY")  # 开发环境使用虚拟key
+    ANTHROPIC_API_KEY: str = Field("sk-ant-dummy", env="ANTHROPIC_API_KEY")  # 开发环境使用虚拟key
     LLM_PROVIDER: str = Field("openai", env="LLM_PROVIDER")
 
     # 爬虫配置
@@ -61,7 +61,7 @@ class Settings(BaseSettings):
     LOG_FILE: str = Field("logs/app.log", env="LOG_FILE")
 
     # 安全配置
-    SECRET_KEY: str = Field(..., env="SECRET_KEY")
+    SECRET_KEY: str = Field("dev-secret-key", env="SECRET_KEY")  # 开发环境使用固定key
     ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(30, env="ACCESS_TOKEN_EXPIRE_MINUTES")
     ALLOWED_ORIGINS: List[str] = Field(
         ["http://localhost:3000", "http://localhost:8080"],
@@ -85,17 +85,17 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: Optional[str] = Field(None, env="SMTP_PASSWORD")
 
     # 新增数据库配置
-    SQLITE_URL: str
-    MONGO_URL: str
-    MONGO_DB: str
-    REDIS_URL: str
-    MONITOR_INTERVAL: int
-    ALERT_LEVELS: List[str]
-    CRAWL_INTERVAL: int
-    MAX_RETRIES: int
-    TIMEOUT: int
-    CACHE_TTL: int
-    LOG_DIR: Path
+    SQLITE_URL: str = Field("sqlite:///data/crawler.db", env="SQLITE_URL")
+    MONGO_URL: str = Field("mongodb://localhost:27017", env="MONGO_URL")
+    MONGO_DB: str = Field("crawler", env="MONGO_DB")
+    REDIS_URL: str = Field("redis://localhost:6379/0", env="REDIS_URL")
+    MONITOR_INTERVAL: int = Field(60, env="MONITOR_INTERVAL")
+    ALERT_LEVELS: List[str] = Field(["INFO", "WARNING", "ERROR"], env="ALERT_LEVELS")
+    CRAWL_INTERVAL: int = Field(300, env="CRAWL_INTERVAL")
+    MAX_RETRIES: int = Field(3, env="MAX_RETRIES")
+    TIMEOUT: int = Field(30, env="TIMEOUT")
+    CACHE_TTL: int = Field(3600, env="CACHE_TTL")
+    LOG_DIR: Path = Field(Path("logs"), env="LOG_DIR")
 
     # 项目路径
     BASE_DIR: Path = Field(default=Path(__file__).parent.parent.parent)
@@ -212,7 +212,8 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
-        case_sensitive=True
+        case_sensitive=True,
+        extra="allow"  # 允许额外的字段
     )
 
 

@@ -137,4 +137,4 @@ class Report(BaseModel):
     status = Column(Integer, default=0)  # 0: 草稿, 1: 已发布
 
     # 关联关系
-    contents = relationship('Content', secondary=report_contents, back_populates='reports') 
+    contents = relationship('Content', secondary=report_contents, back_populates='reports')

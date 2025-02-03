@@ -6,6 +6,9 @@ from abc import ABC, abstractmethod
 import asyncio
 from datetime import datetime, timedelta
 import json
+import random
+import time
+from loguru import logger
 
 from src.utils.headers_manager import HeadersManager
 from src.utils.rate_limiter import RateLimiter
@@ -26,19 +29,19 @@ class BaseCrawler(ABC):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.headers_manager = HeadersManager()
         self.rate_limiter = RateLimiter(1)  # 默认每秒1个请求
+        self.semaphore = asyncio.Semaphore(5)  # 并发控制
+        self.request_interval = (1, 3)  # 请求间隔范围(秒)
+        self.retry_times = 3  # 重试次数
+        self.retry_interval = (1, 3)  # 重试间隔范围(秒)
 
     async def __aenter__(self):
         """创建会话"""
-        self.session = aiohttp.ClientSession(
-            timeout=aiohttp.ClientTimeout(total=self.timeout),
-            headers=self.headers
-        )
+        await self.init_session()
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """关闭会话"""
-        if self.session:
-            await self.session.close()
+        await self.close()
 
     @abstractmethod
     async def search(self, keyword: str, time_range: str, limit: int) -> List[Dict[str, Any]]:
@@ -69,6 +72,122 @@ class BaseCrawler(ABC):
         except Exception as e:
             self.logger.error(f"POST请求失败: {url}, {str(e)}")
             raise
+
+    def parse_time_range(self, time_range: str) -> datetime:
+        """解析时间范围"""
+        hours = int(time_range.replace('h', ''))
+        return datetime.now() - timedelta(hours=hours)
+
+    def filter_by_time(self, items: List[Dict], time_range: str) -> List[Dict]:
+        """按时间过滤结果"""
+        if not time_range:
+            return items
+            
+        start_time = self.parse_time_range(time_range)
+        return [
+            item for item in items
+            if datetime.fromisoformat(item['publish_time']) >= start_time
+        ]
+
+    @abstractmethod
+    def parse(self, data: Dict[str, Any]) -> Optional[Any]:
+        """解析内容数据
+
+        Args:
+            data: 内容数据
+
+        Returns:
+            Optional[Any]: 解析后的内容对象
+        """
+        pass
+
+    @abstractmethod
+    async def crawl(self, keyword: str, **kwargs) -> List[Any]:
+        """爬取内容
+
+        Args:
+            keyword: 搜索关键词
+            **kwargs: 其他参数
+
+        Returns:
+            List[Any]: 爬取到的内容列表
+        """
+        pass
+
+    async def init_session(self):
+        """初始化会话"""
+        if not self.session:
+            self.session = aiohttp.ClientSession(
+                timeout=aiohttp.ClientTimeout(total=self.timeout),
+                headers=self.headers,
+                connector=aiohttp.TCPConnector(limit=100)  # 连接池大小
+            )
+            
+    async def close(self):
+        """关闭爬虫"""
+        if self.session:
+            await self.session.close()
+            self.session = None
+            
+    async def random_sleep(self):
+        """随机延迟"""
+        await asyncio.sleep(random.uniform(*self.request_interval))
+        
+    async def safe_request(self, method: str, url: str, **kwargs) -> Optional[Dict]:
+        """安全请求
+        
+        Args:
+            method: 请求方法
+            url: 请求地址
+            **kwargs: 请求参数
+            
+        Returns:
+            响应数据
+        """
+        await self.init_session()
+        
+        for i in range(self.retry_times):
+            try:
+                async with self.semaphore:  # 并发控制
+                    await self.random_sleep()  # 随机延迟
+                    
+                    async with self.session.request(method, url, **kwargs) as response:
+                        if response.status == 200:
+                            return await response.json()
+                        elif response.status in [403, 429]:  # IP被封或请求过频
+                            logger.warning(f"请求被限制: {response.status}")
+                            await asyncio.sleep(random.uniform(*self.retry_interval))
+                        else:
+                            logger.error(f"请求失败: {response.status}")
+                            
+            except asyncio.TimeoutError:
+                logger.warning(f"请求超时: {url}")
+            except Exception as e:
+                logger.error(f"请求异常: {str(e)}")
+                
+            # 重试等待
+            if i < self.retry_times - 1:
+                await asyncio.sleep(random.uniform(*self.retry_interval))
+                
+        return None
+        
+    async def get(self, url: str, **kwargs) -> Optional[Dict]:
+        """GET请求"""
+        return await self.safe_request('GET', url, **kwargs)
+        
+    async def post(self, url: str, **kwargs) -> Optional[Dict]:
+        """POST请求"""
+        return await self.safe_request('POST', url, **kwargs)
+        
+    def parse_time(self, timestamp: int) -> datetime:
+        """解析时间戳"""
+        return datetime.fromtimestamp(timestamp)
+        
+    def clean_text(self, text: str) -> str:
+        """清理文本"""
+        if not text:
+            return ''
+        return text.strip().replace('\n', ' ').replace('\r', ' ').replace('\t', ' ')
 
     def parse_time_range(self, time_range: str) -> datetime:
         """解析时间范围"""

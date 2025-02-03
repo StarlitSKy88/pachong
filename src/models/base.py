@@ -6,8 +6,8 @@ from sqlalchemy import Column, DateTime, Integer
 from sqlalchemy.sql import func
 from sqlalchemy.ext.declarative import declarative_base
 
+# 创建基类
 Base = declarative_base()
-
 
 class BaseModel(Base):
     """基础模型类"""

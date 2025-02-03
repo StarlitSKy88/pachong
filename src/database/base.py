@@ -3,14 +3,14 @@
 from datetime import datetime
 from typing import Any, Dict, Optional, TypeVar
 
-from sqlalchemy import create_engine, MetaData, Column, Integer, DateTime
+from sqlalchemy import create_engine, Column, Integer, DateTime
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import QueuePool
 from sqlalchemy.sql import func
 
 from src.config.settings import settings
 from src.utils.logger import get_logger
-from src.models.base import Base
+from src.models import Base
 
 logger = get_logger(__name__)
 

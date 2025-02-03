@@ -25,6 +25,7 @@ MANIFEST
 venv/
 ENV/
 env/
+.env
 
 # IDE
 .idea/
@@ -211,3 +212,25 @@ output/
 data/
 *.pid
 *.socket
+
+# Local development settings
+local_settings.py
+
+# Media files
+media/
+uploads/
+
+# Temporary files
+*.tmp
+*.temp
+
+# Coverage reports
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+
+# Project specific
+data/proxies.json
+config/env/.env

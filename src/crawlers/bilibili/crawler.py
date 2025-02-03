@@ -239,3 +239,105 @@ class BiliBiliCrawler(BaseCrawler):
                 continue
                 
         return results 
+
+    async def get_video_tags(self, aid: int) -> List[Dict]:
+        """获取视频标签"""
+        url = f"https://api.bilibili.com/x/tag/archive/tags"
+        params = {'aid': aid}
+        
+        async with aiohttp.ClientSession() as session:
+            proxy = await self.proxy_manager.get_proxy() if self.proxy_manager else None
+            try:
+                async with session.get(url, headers=self.headers, params=params, proxy=proxy) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        if proxy:
+                            self.proxy_manager.update_proxy_status(proxy, True)
+                        return data.get('data', [])
+                    else:
+                        if proxy:
+                            self.proxy_manager.update_proxy_status(proxy, False)
+                        return []
+            except Exception as e:
+                if proxy:
+                    self.proxy_manager.update_proxy_status(proxy, False)
+                logger.error(f"获取视频标签失败: {str(e)}")
+                return []
+                
+    async def get_video_stat(self, aid: int) -> Dict:
+        """获取视频统计信息"""
+        url = f"https://api.bilibili.com/x/web-interface/archive/stat"
+        params = {'aid': aid}
+        
+        async with aiohttp.ClientSession() as session:
+            proxy = await self.proxy_manager.get_proxy() if self.proxy_manager else None
+            try:
+                async with session.get(url, headers=self.headers, params=params, proxy=proxy) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        if proxy:
+                            self.proxy_manager.update_proxy_status(proxy, True)
+                        return data.get('data', {})
+                    else:
+                        if proxy:
+                            self.proxy_manager.update_proxy_status(proxy, False)
+                        return {}
+            except Exception as e:
+                if proxy:
+                    self.proxy_manager.update_proxy_status(proxy, False)
+                logger.error(f"获取视频统计失败: {str(e)}")
+                return {}
+                
+    async def get_video_pages(self, bvid: str) -> List[Dict]:
+        """获取视频分P信息"""
+        url = f"https://api.bilibili.com/x/player/pagelist"
+        params = {'bvid': bvid}
+        
+        async with aiohttp.ClientSession() as session:
+            proxy = await self.proxy_manager.get_proxy() if self.proxy_manager else None
+            try:
+                async with session.get(url, headers=self.headers, params=params, proxy=proxy) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        if proxy:
+                            self.proxy_manager.update_proxy_status(proxy, True)
+                        return data.get('data', [])
+                    else:
+                        if proxy:
+                            self.proxy_manager.update_proxy_status(proxy, False)
+                        return []
+            except Exception as e:
+                if proxy:
+                    self.proxy_manager.update_proxy_status(proxy, False)
+                logger.error(f"获取视频分P失败: {str(e)}")
+                return []
+                
+    async def get_video_comments(self, aid: int, page: int = 1, page_size: int = 20) -> Dict:
+        """获取视频评论"""
+        url = "https://api.bilibili.com/x/v2/reply"
+        params = {
+            'type': 1,
+            'oid': aid,
+            'pn': page,
+            'ps': page_size,
+            'sort': 2  # 按热度排序
+        }
+        
+        async with aiohttp.ClientSession() as session:
+            proxy = await self.proxy_manager.get_proxy() if self.proxy_manager else None
+            try:
+                async with session.get(url, headers=self.headers, params=params, proxy=proxy) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        if proxy:
+                            self.proxy_manager.update_proxy_status(proxy, True)
+                        return data.get('data', {})
+                    else:
+                        if proxy:
+                            self.proxy_manager.update_proxy_status(proxy, False)
+                        return {}
+            except Exception as e:
+                if proxy:
+                    self.proxy_manager.update_proxy_status(proxy, False)
+                logger.error(f"获取视频评论失败: {str(e)}")
+                return {} 
