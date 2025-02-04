@@ -1,29 +1,44 @@
-"""数据模型包"""
+"""模型包初始化文件。"""
 
-from .base import Base, BaseModel
-from .enums import ContentType, ContentStatus
+from .base import Base
 from .tables import (
-    Platform,
-    Tag,
     Content,
+    Tag,
+    Platform,
+    Report,
+    Task,
+    TaskLog,
+    Cookie,
+    Proxy,
+    Request,
+    Error,
+    Category,
     Comment,
     GeneratedContent,
-    Report,
     content_tags,
-    report_contents
+    report_contents,
+    content_categories
 )
+from .enums import ContentType, ContentStatus
 
 __all__ = [
     'Base',
-    'BaseModel',
-    'Platform',
-    'Tag',
-    'content_tags',
     'Content',
-    'Comment',
-    'ContentType',
-    'ContentStatus',
-    'GeneratedContent',
+    'Tag',
+    'Platform',
     'Report',
-    'report_contents'
+    'Task',
+    'TaskLog',
+    'Cookie',
+    'Proxy',
+    'Request',
+    'Error',
+    'Category',
+    'Comment',
+    'GeneratedContent',
+    'content_tags',
+    'report_contents',
+    'content_categories',
+    'ContentType',
+    'ContentStatus'
 ] 

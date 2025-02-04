@@ -7,13 +7,13 @@ from datetime import datetime, timedelta
 import aiohttp
 import logging
 from .proxy_providers import ProxyProviderManager, ZhimaProxyProvider, KuaidailiProxyProvider
-from ..utils.logger import get_logger
+from loguru import logger
 
 class ProxyManager:
     """代理管理器"""
     
     def __init__(self):
-        self.logger = get_logger('proxy_manager')
+        self.logger = logger.bind(name='proxy_manager')
         self.proxies = []  # 代理列表
         self.proxy_scores = {}  # 代理评分
         self.test_url = 'http://www.baidu.com'  # 测试URL

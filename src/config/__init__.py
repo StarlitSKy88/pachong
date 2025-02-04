@@ -1,4 +1,9 @@
-"""配置包"""
-from .settings import settings, get_database_config
+"""配置包初始化文件。"""
 
-__all__ = ['settings', 'get_database_config'] 
+from .config import Config
+from .settings import settings
+
+__all__ = [
+    'Config',
+    'settings'
+] 

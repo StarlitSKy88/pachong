@@ -3,13 +3,15 @@ from datetime import datetime, timedelta
 from .base_monitor import BaseMonitor
 from ..database import content_dao, task_log_dao
 from ..crawlers import XHSCrawler, BiliBiliCrawler
-from ..models.content import Content
+from ..models import Content
 from ..crawlers.proxy_manager import ProxyManager
 from ..crawlers.cookie_manager import CookieManager
 import time
 import aiohttp
 import asyncio
 from ..utils.logger import get_logger
+from loguru import logger
+from ..utils.error_handler import MonitorError
 
 class CrawlerMonitor(BaseMonitor):
     """爬虫监控类"""

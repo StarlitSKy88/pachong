@@ -10,6 +10,16 @@ from src.utils.exceptions import ConfigError
 class TestCrawler(BaseCrawler):
     """测试用爬虫类"""
     
+    def __init__(self, **kwargs):
+        """初始化。
+
+        Args:
+            **kwargs: 配置参数
+        """
+        super().__init__()
+        self.timeout = kwargs.get("timeout", 10)
+        self.retry_times = kwargs.get("retry_times", 3)
+    
     async def crawl(self, keywords, time_range="24h", limit=10):
         """测试采集方法"""
         return []
@@ -17,6 +27,48 @@ class TestCrawler(BaseCrawler):
     async def parse(self, data):
         """测试解析方法"""
         return data
+
+    async def get_detail(self, content_id: str):
+        """获取内容详情。
+
+        Args:
+            content_id: 内容ID
+
+        Returns:
+            内容详情
+        """
+        return {
+            "id": content_id,
+            "title": "测试内容",
+            "content": "这是一个测试内容",
+            "author": "测试作者",
+            "publish_time": "2024-03-27 12:00:00"
+        }
+
+    async def search(self, keyword: str, limit: int = 10):
+        """搜索内容。
+
+        Args:
+            keyword: 搜索关键词
+            limit: 限制数量
+
+        Returns:
+            搜索结果列表
+        """
+        return [
+            {
+                "id": f"test_{i}",
+                "title": f"测试内容_{i}",
+                "content": f"这是测试内容_{i}",
+                "author": "测试作者",
+                "publish_time": "2024-03-27 12:00:00"
+            }
+            for i in range(limit)
+        ]
+
+    async def start(self):
+        """启动爬虫。"""
+        pass
 
 @pytest.fixture
 def config_manager():

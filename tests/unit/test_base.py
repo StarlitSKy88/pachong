@@ -6,10 +6,13 @@ import os
 import pytest_asyncio
 from contextlib import asynccontextmanager
 import time
+from typing import Dict, Any
+from sqlalchemy.orm import Session
 
+from src.database.base import Database
+from src.database.session import get_session
 from src.crawlers.base import BaseCrawler
-from src.models.platform import Platform
-from src.models.content import Content
+from src.models import Platform, Content
 from src.utils.proxy import ProxyManager
 from src.utils.cookie import CookieManager
 

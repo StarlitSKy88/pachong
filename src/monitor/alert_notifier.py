@@ -1,387 +1,331 @@
-"""告警通知器模块
+"""告警通知模块
 
-该模块负责告警通知的发送，支持多种通知渠道：
-1. 邮件通知
-2. Webhook通知
-3. 钉钉通知
-4. 企业微信通知
-5. 自定义通知
+该模块负责告警通知的发送，包括：
+1. 通知渠道管理
+2. 通知模板管理
+3. 通知发送记录
+4. 通知重试机制
 """
 
-import asyncio
 import logging
 import json
-import hmac
-import hashlib
-import base64
-import time
-from typing import Dict, List, Any, Optional
-from datetime import datetime
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-import aiosmtplib
+import asyncio
+from datetime import datetime, timedelta
+from typing import Dict, List, Any, Optional, Callable
+from dataclasses import dataclass
+from enum import Enum
 import aiohttp
-from jinja2 import Template, Environment, FileSystemLoader
-from pathlib import Path
+import jinja2
 
-from .alert_rule import AlertStatus, AlertSeverity
+from .alert_rule import AlertRule, AlertStatus, AlertSeverity
 
 logger = logging.getLogger(__name__)
 
-class AlertTemplate:
-    """告警模板"""
-    
-    def __init__(self, template_dir: Optional[str] = None):
-        if template_dir:
-            self.env = Environment(
-                loader=FileSystemLoader(template_dir),
-                autoescape=True
-            )
-        else:
-            self.env = Environment(autoescape=True)
-            self._init_default_templates()
-    
-    def _init_default_templates(self):
-        """初始化默认模板"""
-        # 邮件模板
-        self.env.from_string("""
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <title>告警通知</title>
-    <style>
-        body { font-family: Arial, sans-serif; }
-        .alert { padding: 15px; margin-bottom: 20px; border: 1px solid transparent; border-radius: 4px; }
-        .alert-info { color: #31708f; background-color: #d9edf7; border-color: #bce8f1; }
-        .alert-warning { color: #8a6d3b; background-color: #fcf8e3; border-color: #faebcc; }
-        .alert-error { color: #a94442; background-color: #f2dede; border-color: #ebccd1; }
-        .alert-critical { color: #ffffff; background-color: #d9534f; border-color: #d43f3a; }
-    </style>
-</head>
-<body>
-    <div class="alert alert-{{ alert.rule.severity }}">
-        <h3>{{ alert.rule.name }}</h3>
-        <p>{{ alert.rule.description }}</p>
-        <ul>
-            <li>指标: {{ alert.rule.metric }}</li>
-            <li>当前值: {{ alert.value }}</li>
-            <li>阈值: {{ alert.rule.operator }} {{ alert.rule.threshold }}</li>
-            <li>时间: {{ alert.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</li>
-            <li>状态: {{ alert.status }}</li>
-        </ul>
-    </div>
-</body>
-</html>
-""", name="email.html")
-        
-        # 钉钉模板
-        self.env.from_string("""
-{
-    "msgtype": "markdown",
-    "markdown": {
-        "title": "{{ alert.rule.name }}",
-        "text": "### {{ alert.rule.name }}\n\n{{ alert.rule.description }}\n\n> 指标: {{ alert.rule.metric }}\n> 当前值: {{ alert.value }}\n> 阈值: {{ alert.rule.operator }} {{ alert.rule.threshold }}\n> 时间: {{ alert.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}\n> 状态: {{ alert.status }}"
-    }
-}
-""", name="dingtalk.json")
-        
-        # 企业微信模板
-        self.env.from_string("""
-{
-    "msgtype": "markdown",
-    "markdown": {
-        "content": "### {{ alert.rule.name }}\n\n{{ alert.rule.description }}\n\n> 指标: {{ alert.rule.metric }}\n> 当前值: {{ alert.value }}\n> 阈值: {{ alert.rule.operator }} {{ alert.rule.threshold }}\n> 时间: {{ alert.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}\n> 状态: {{ alert.status }}"
-    }
-}
-""", name="wechat.json")
-    
-    def render(self, template_name: str, **kwargs) -> str:
-        """渲染模板"""
-        template = self.env.get_template(template_name)
-        return template.render(**kwargs)
+class NotifyChannel(str, Enum):
+    """通知渠道"""
+    EMAIL = "email"
+    DINGTALK = "dingtalk"
+    WECHAT = "wechat"
+    SMS = "sms"
+    WEBHOOK = "webhook"
+
+@dataclass
+class NotifyTemplate:
+    """通知模板"""
+    name: str
+    channel: str
+    title_template: str
+    content_template: str
+    enabled: bool = True
+
+@dataclass
+class NotifyConfig:
+    """通知配置"""
+    channel: str
+    config: Dict[str, Any]
+    enabled: bool = True
+    retry_count: int = 3
+    retry_interval: int = 60
+    timeout: int = 10
+
+@dataclass
+class NotifyRecord:
+    """通知记录"""
+    id: str
+    alert_id: str
+    channel: str
+    title: str
+    content: str
+    timestamp: datetime
+    status: str
+    error: Optional[str] = None
+    retry_count: int = 0
 
 class AlertNotifier:
     """告警通知器"""
     
-    def __init__(self, template_dir: Optional[str] = None):
+    def __init__(self):
         self.logger = logging.getLogger('AlertNotifier')
-        self.template = AlertTemplate(template_dir)
         
         # 通知配置
-        self.email_config: Optional[Dict] = None
-        self.webhook_config: Optional[Dict] = None
-        self.dingtalk_config: Optional[Dict] = None
-        self.wechat_config: Optional[Dict] = None
+        self.configs: Dict[str, NotifyConfig] = {}
         
-        # 自定义处理器
-        self.handlers: Dict[str, List[callable]] = {
-            AlertSeverity.INFO: [],
-            AlertSeverity.WARNING: [],
-            AlertSeverity.ERROR: [],
-            AlertSeverity.CRITICAL: []
+        # 通知模板
+        self.templates: Dict[str, NotifyTemplate] = {}
+        
+        # 通知记录
+        self.records: List[NotifyRecord] = []
+        
+        # 通知处理器
+        self.handlers: Dict[str, Callable] = {
+            NotifyChannel.EMAIL: self._send_email,
+            NotifyChannel.DINGTALK: self._send_dingtalk,
+            NotifyChannel.WECHAT: self._send_wechat,
+            NotifyChannel.SMS: self._send_sms,
+            NotifyChannel.WEBHOOK: self._send_webhook
         }
+        
+        # 模板引擎
+        self.jinja_env = jinja2.Environment(
+            autoescape=True,
+            trim_blocks=True,
+            lstrip_blocks=True
+        )
     
-    def configure_email(
+    def add_config(self, channel: str, config: Dict[str, Any]):
+        """添加通知配置"""
+        self.configs[channel] = NotifyConfig(
+            channel=channel,
+            config=config
+        )
+    
+    def add_template(
         self,
-        host: str,
-        port: int,
-        username: str,
-        password: str,
-        use_tls: bool = True,
-        recipients: List[str] = None
+        name: str,
+        channel: str,
+        title_template: str,
+        content_template: str
     ):
-        """配置邮件通知"""
-        self.email_config = {
-            'host': host,
-            'port': port,
-            'username': username,
-            'password': password,
-            'use_tls': use_tls,
-            'recipients': recipients or []
-        }
-        self.logger.info("Email notification configured")
+        """添加通知模板"""
+        self.templates[name] = NotifyTemplate(
+            name=name,
+            channel=channel,
+            title_template=title_template,
+            content_template=content_template
+        )
     
-    def configure_webhook(self, url: str, headers: Optional[Dict] = None):
-        """配置Webhook通知"""
-        self.webhook_config = {
-            'url': url,
-            'headers': headers or {}
-        }
-        self.logger.info("Webhook notification configured")
-    
-    def configure_dingtalk(self, access_token: str, secret: str = None):
-        """配置钉钉通知"""
-        self.dingtalk_config = {
-            'access_token': access_token,
-            'secret': secret
-        }
-        self.logger.info("DingTalk notification configured")
-    
-    def configure_wechat(
+    async def notify(
         self,
-        corp_id: str,
-        corp_secret: str,
-        agent_id: str,
-        to_user: str = "@all"
+        alert_id: str,
+        rule: AlertRule,
+        value: float,
+        template_name: Optional[str] = None,
+        channels: Optional[List[str]] = None
     ):
-        """配置企业微信通知"""
-        self.wechat_config = {
-            'corp_id': corp_id,
-            'corp_secret': corp_secret,
-            'agent_id': agent_id,
-            'to_user': to_user,
-            'access_token': None,
-            'token_expires': 0
-        }
-        self.logger.info("WeChat notification configured")
-    
-    def add_handler(self, severity: str, handler: callable):
-        """添加自定义处理器"""
-        if severity in self.handlers:
-            self.handlers[severity].append(handler)
-    
-    def remove_handler(self, severity: str, handler: callable):
-        """移除自定义处理器"""
-        if severity in self.handlers and handler in self.handlers[severity]:
-            self.handlers[severity].remove(handler)
-    
-    async def send_alert(self, alert: 'Alert'):
         """发送告警通知"""
-        try:
-            # 调用自定义处理器
-            for handler in self.handlers.get(alert.rule.severity, []):
-                try:
-                    await handler(alert)
-                except Exception as e:
-                    self.logger.error(f"Error in custom handler: {e}")
+        # 获取模板
+        template = None
+        if template_name:
+            template = self.templates.get(template_name)
+        
+        # 准备通知数据
+        data = {
+            'alert_id': alert_id,
+            'rule_name': rule.name,
+            'rule_group': rule.group.name if rule.group else '',
+            'metric': rule.metric,
+            'value': value,
+            'threshold': rule.threshold,
+            'operator': rule.operator,
+            'severity': rule.severity,
+            'description': rule.description,
+            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        }
+        
+        # 发送通知
+        tasks = []
+        for channel in (channels or self.configs.keys()):
+            if channel not in self.configs:
+                continue
+                
+            config = self.configs[channel]
+            if not config.enabled:
+                continue
+                
+            # 渲染模板
+            if template and template.channel == channel:
+                title = self._render_template(template.title_template, data)
+                content = self._render_template(template.content_template, data)
+            else:
+                title = f"[{rule.severity}] {rule.name}"
+                content = rule.format_message(value)
             
-            # 发送邮件通知
-            if self.email_config:
-                await self._send_email(alert)
-            
-            # 发送Webhook通知
-            if self.webhook_config:
-                await self._send_webhook(alert)
-            
-            # 发送钉钉通知
-            if self.dingtalk_config:
-                await self._send_dingtalk(alert)
-            
-            # 发送企业微信通知
-            if self.wechat_config:
-                await self._send_wechat(alert)
-            
-        except Exception as e:
-            self.logger.error(f"Error sending alert notification: {e}")
-            raise
-    
-    async def _send_email(self, alert: 'Alert'):
-        """发送邮件通知"""
-        try:
-            # 渲染邮件内容
-            html_content = self.template.render('email.html', alert=alert)
-            
-            # 创建邮件
-            msg = MIMEMultipart()
-            msg['Subject'] = f"[{alert.rule.severity.upper()}] {alert.rule.name}"
-            msg['From'] = self.email_config['username']
-            msg['To'] = ', '.join(self.email_config['recipients'])
-            
-            # 添加HTML内容
-            html_part = MIMEText(html_content, 'html')
-            msg.attach(html_part)
-            
-            # 发送邮件
-            await aiosmtplib.send(
-                msg,
-                hostname=self.email_config['host'],
-                port=self.email_config['port'],
-                username=self.email_config['username'],
-                password=self.email_config['password'],
-                use_tls=self.email_config['use_tls']
+            # 创建通知记录
+            record = NotifyRecord(
+                id=f"{alert_id}_{channel}_{len(self.records)}",
+                alert_id=alert_id,
+                channel=channel,
+                title=title,
+                content=content,
+                timestamp=datetime.now(),
+                status='pending'
             )
+            self.records.append(record)
             
-            self.logger.info(f"Email alert sent: {alert.rule.name}")
-            
-        except Exception as e:
-            self.logger.error(f"Error sending email alert: {e}")
-            raise
+            # 发送通知
+            task = asyncio.create_task(
+                self._send_notify(config, record)
+            )
+            tasks.append(task)
+        
+        # 等待所有通知发送完成
+        if tasks:
+            await asyncio.gather(*tasks)
     
-    async def _send_webhook(self, alert: 'Alert'):
-        """发送Webhook通知"""
+    def get_records(
+        self,
+        alert_id: Optional[str] = None,
+        channel: Optional[str] = None,
+        start_time: Optional[datetime] = None,
+        end_time: Optional[datetime] = None,
+        status: Optional[str] = None,
+        limit: int = 100,
+        offset: int = 0
+    ) -> List[NotifyRecord]:
+        """查询通知记录"""
+        records = self.records
+        
+        if alert_id:
+            records = [r for r in records if r.alert_id == alert_id]
+        if channel:
+            records = [r for r in records if r.channel == channel]
+        if start_time:
+            records = [r for r in records if r.timestamp >= start_time]
+        if end_time:
+            records = [r for r in records if r.timestamp <= end_time]
+        if status:
+            records = [r for r in records if r.status == status]
+            
+        return sorted(
+            records,
+            key=lambda x: x.timestamp,
+            reverse=True
+        )[offset:offset+limit]
+    
+    async def _send_notify(
+        self,
+        config: NotifyConfig,
+        record: NotifyRecord
+    ):
+        """发送通知"""
+        handler = self.handlers.get(config.channel)
+        if not handler:
+            record.status = 'failed'
+            record.error = f"Unsupported channel: {config.channel}"
+            return
+        
+        # 重试发送
+        for i in range(config.retry_count):
+            try:
+                await handler(config, record)
+                record.status = 'success'
+                return
+            except Exception as e:
+                record.status = 'failed'
+                record.error = str(e)
+                record.retry_count += 1
+                
+                if i < config.retry_count - 1:
+                    await asyncio.sleep(config.retry_interval)
+    
+    def _render_template(self, template_str: str, data: Dict[str, Any]) -> str:
+        """渲染模板"""
         try:
-            # 准备请求数据
+            template = self.jinja_env.from_string(template_str)
+            return template.render(**data)
+        except Exception as e:
+            self.logger.error(f"Error rendering template: {e}")
+            return template_str
+    
+    async def _send_email(self, config: NotifyConfig, record: NotifyRecord):
+        """发送邮件通知"""
+        # TODO: 实现邮件发送
+        pass
+    
+    async def _send_dingtalk(self, config: NotifyConfig, record: NotifyRecord):
+        """发送钉钉通知"""
+        webhook_url = config.config.get('webhook_url')
+        if not webhook_url:
+            raise ValueError("Missing webhook_url in dingtalk config")
+            
+        async with aiohttp.ClientSession() as session:
             data = {
-                'alert': {
-                    'name': alert.rule.name,
-                    'description': alert.rule.description,
-                    'metric': alert.rule.metric,
-                    'value': alert.value,
-                    'threshold': alert.rule.threshold,
-                    'operator': alert.rule.operator,
-                    'severity': alert.rule.severity,
-                    'status': alert.status,
-                    'timestamp': alert.timestamp.isoformat()
+                "msgtype": "markdown",
+                "markdown": {
+                    "title": record.title,
+                    "text": record.content
                 }
             }
             
-            # 发送请求
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    self.webhook_config['url'],
-                    json=data,
-                    headers=self.webhook_config['headers']
-                ) as resp:
-                    if resp.status != 200:
-                        raise Exception(f"Webhook request failed: {resp.status}")
-            
-            self.logger.info(f"Webhook alert sent: {alert.rule.name}")
-            
-        except Exception as e:
-            self.logger.error(f"Error sending webhook alert: {e}")
-            raise
+            async with session.post(
+                webhook_url,
+                json=data,
+                timeout=config.timeout
+            ) as resp:
+                if resp.status != 200:
+                    text = await resp.text()
+                    raise ValueError(f"Failed to send dingtalk: {text}")
     
-    async def _send_dingtalk(self, alert: 'Alert'):
-        """发送钉钉通知"""
-        try:
-            # 准备URL
-            url = f"https://oapi.dingtalk.com/robot/send?access_token={self.dingtalk_config['access_token']}"
+    async def _send_wechat(self, config: NotifyConfig, record: NotifyRecord):
+        """发送企业微信通知"""
+        webhook_url = config.config.get('webhook_url')
+        if not webhook_url:
+            raise ValueError("Missing webhook_url in wechat config")
             
-            # 添加签名
-            if self.dingtalk_config['secret']:
-                timestamp = str(round(time.time() * 1000))
-                secret = self.dingtalk_config['secret']
-                string_to_sign = f"{timestamp}\n{secret}"
-                hmac_code = hmac.new(
-                    secret.encode('utf-8'),
-                    string_to_sign.encode('utf-8'),
-                    digestmod=hashlib.sha256
-                ).digest()
-                sign = base64.b64encode(hmac_code).decode('utf-8')
-                url += f"&timestamp={timestamp}&sign={sign}"
-            
-            # 渲染消息内容
-            content = self.template.render('dingtalk.json', alert=alert)
-            data = json.loads(content)
-            
-            # 发送请求
-            async with aiohttp.ClientSession() as session:
-                async with session.post(url, json=data) as resp:
-                    if resp.status != 200:
-                        raise Exception(f"DingTalk request failed: {resp.status}")
-                    result = await resp.json()
-                    if result['errcode'] != 0:
-                        raise Exception(f"DingTalk API error: {result['errmsg']}")
-            
-            self.logger.info(f"DingTalk alert sent: {alert.rule.name}")
-            
-        except Exception as e:
-            self.logger.error(f"Error sending DingTalk alert: {e}")
-            raise
-    
-    async def _get_wechat_token(self):
-        """获取企业微信访问令牌"""
-        try:
-            now = time.time()
-            
-            # 检查是否需要更新token
-            if (self.wechat_config['access_token'] and 
-                now < self.wechat_config['token_expires']):
-                return self.wechat_config['access_token']
-            
-            # 获取新token
-            url = "https://qyapi.weixin.qq.com/cgi-bin/gettoken"
-            params = {
-                'corpid': self.wechat_config['corp_id'],
-                'corpsecret': self.wechat_config['corp_secret']
+        async with aiohttp.ClientSession() as session:
+            data = {
+                "msgtype": "markdown",
+                "markdown": {
+                    "content": f"### {record.title}\n{record.content}"
+                }
             }
             
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, params=params) as resp:
-                    if resp.status != 200:
-                        raise Exception(f"WeChat request failed: {resp.status}")
-                    result = await resp.json()
-                    if result['errcode'] != 0:
-                        raise Exception(f"WeChat API error: {result['errmsg']}")
-                    
-                    self.wechat_config['access_token'] = result['access_token']
-                    self.wechat_config['token_expires'] = now + result['expires_in'] - 60
-                    return result['access_token']
-                    
-        except Exception as e:
-            self.logger.error(f"Error getting WeChat token: {e}")
-            raise
+            async with session.post(
+                webhook_url,
+                json=data,
+                timeout=config.timeout
+            ) as resp:
+                if resp.status != 200:
+                    text = await resp.text()
+                    raise ValueError(f"Failed to send wechat: {text}")
     
-    async def _send_wechat(self, alert: 'Alert'):
-        """发送企业微信通知"""
-        try:
-            # 获取访问令牌
-            access_token = await self._get_wechat_token()
+    async def _send_sms(self, config: NotifyConfig, record: NotifyRecord):
+        """发送短信通知"""
+        # TODO: 实现短信发送
+        pass
+    
+    async def _send_webhook(self, config: NotifyConfig, record: NotifyRecord):
+        """发送Webhook通知"""
+        webhook_url = config.config.get('webhook_url')
+        if not webhook_url:
+            raise ValueError("Missing webhook_url in webhook config")
             
-            # 准备URL
-            url = f"https://qyapi.weixin.qq.com/cgi-bin/message/send?access_token={access_token}"
+        async with aiohttp.ClientSession() as session:
+            data = {
+                "alert_id": record.alert_id,
+                "title": record.title,
+                "content": record.content,
+                "timestamp": record.timestamp.isoformat()
+            }
             
-            # 渲染消息内容
-            content = self.template.render('wechat.json', alert=alert)
-            data = json.loads(content)
-            data.update({
-                'touser': self.wechat_config['to_user'],
-                'agentid': self.wechat_config['agent_id'],
-                'safe': 0
-            })
+            headers = config.config.get('headers', {})
             
-            # 发送请求
-            async with aiohttp.ClientSession() as session:
-                async with session.post(url, json=data) as resp:
-                    if resp.status != 200:
-                        raise Exception(f"WeChat request failed: {resp.status}")
-                    result = await resp.json()
-                    if result['errcode'] != 0:
-                        raise Exception(f"WeChat API error: {result['errmsg']}")
-            
-            self.logger.info(f"WeChat alert sent: {alert.rule.name}")
-            
-        except Exception as e:
-            self.logger.error(f"Error sending WeChat alert: {e}")
-            raise 
+            async with session.post(
+                webhook_url,
+                json=data,
+                headers=headers,
+                timeout=config.timeout
+            ) as resp:
+                if resp.status not in (200, 201, 202):
+                    text = await resp.text()
+                    raise ValueError(f"Failed to send webhook: {text}") 

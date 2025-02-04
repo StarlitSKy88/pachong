@@ -1,0 +1,194 @@
+{
+    "version": "1.0",
+    "formats": {
+        "html": {
+            "enabled": true,
+            "template_dir": "templates/html",
+            "resource_dir": "resources",
+            "default_style": "style.css",
+            "image_quality": 85,
+            "max_image_size": 1920,
+            "batch_concurrency": 5,
+            "create_index": true,
+            "templates": {
+                "article": {
+                    "file": "article.html",
+                    "description": "文章页面模板"
+                },
+                "index": {
+                    "file": "index.html",
+                    "description": "索引页面模板"
+                }
+            }
+        },
+        "pdf": {
+            "enabled": false,
+            "template_dir": "templates/pdf",
+            "resource_dir": "resources",
+            "default_style": "style.css",
+            "image_quality": 85,
+            "max_image_size": 1920,
+            "batch_concurrency": 2,
+            "create_index": true,
+            "templates": {
+                "article": {
+                    "file": "article.html",
+                    "description": "文章页面模板"
+                },
+                "index": {
+                    "file": "index.html",
+                    "description": "目录页面模板"
+                }
+            },
+            "options": {
+                "page_size": "A4",
+                "margin": "2cm",
+                "header_template": "templates/pdf/header.html",
+                "footer_template": "templates/pdf/footer.html",
+                "toc": true,
+                "toc_title": "目录",
+                "print_background": true,
+                "prefer_css_page_size": true
+            }
+        },
+        "epub": {
+            "enabled": false,
+            "template_dir": "templates/epub",
+            "resource_dir": "resources",
+            "default_style": "style.css",
+            "image_quality": 85,
+            "max_image_size": 1920,
+            "batch_concurrency": 2,
+            "create_index": true,
+            "templates": {
+                "article": {
+                    "file": "article.html",
+                    "description": "文章页面模板"
+                },
+                "index": {
+                    "file": "index.html",
+                    "description": "目录页面模板"
+                },
+                "cover": {
+                    "file": "cover.html",
+                    "description": "封面页面模板"
+                }
+            },
+            "options": {
+                "title": "",
+                "author": "",
+                "publisher": "",
+                "language": "zh-CN",
+                "cover_image": "",
+                "description": "",
+                "rights": "",
+                "toc_title": "目录",
+                "chapter_level": 2,
+                "epub_version": "3.0"
+            }
+        }
+    },
+    "storage": {
+        "local": {
+            "enabled": true,
+            "path": "exports",
+            "cleanup_threshold": "1GB",
+            "cleanup_age": "7d"
+        },
+        "s3": {
+            "enabled": false,
+            "endpoint": "https://s3.amazonaws.com",
+            "region": "us-east-1",
+            "bucket": "your-bucket",
+            "prefix": "exports",
+            "access_key": "",
+            "secret_key": "",
+            "options": {
+                "acl": "private",
+                "cache_control": "max-age=86400",
+                "content_type": "auto",
+                "storage_class": "STANDARD"
+            }
+        }
+    },
+    "notification": {
+        "enabled": true,
+        "events": [
+            "export.start",
+            "export.complete",
+            "export.error",
+            "batch.start",
+            "batch.complete",
+            "batch.error"
+        ],
+        "channels": {
+            "email": {
+                "enabled": false,
+                "template": "email/notification.html",
+                "from": "noreply@example.com",
+                "to": ["admin@example.com"],
+                "subject_prefix": "[导出通知]",
+                "smtp": {
+                    "host": "smtp.example.com",
+                    "port": 587,
+                    "username": "",
+                    "password": "",
+                    "use_tls": true,
+                    "timeout": 10
+                }
+            },
+            "webhook": {
+                "enabled": false,
+                "url": "https://example.com/webhook",
+                "method": "POST",
+                "headers": {
+                    "Authorization": "Bearer your-token",
+                    "Content-Type": "application/json"
+                },
+                "timeout": 10,
+                "retry": {
+                    "max_retries": 3,
+                    "delay": 1,
+                    "backoff": 2
+                }
+            }
+        }
+    },
+    "logging": {
+        "level": "INFO",
+        "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        "file": {
+            "enabled": true,
+            "path": "logs/export.log",
+            "max_size": "10MB",
+            "backup_count": 5,
+            "encoding": "utf-8"
+        },
+        "console": {
+            "enabled": true,
+            "format": "%(asctime)s - %(levelname)s - %(message)s",
+            "color": true
+        }
+    },
+    "performance": {
+        "memory_limit": "1GB",
+        "cpu_limit": 0.8,
+        "disk_limit": "10GB",
+        "timeout": {
+            "export": 300,
+            "batch": 3600,
+            "cleanup": 600
+        },
+        "retry": {
+            "max_retries": 3,
+            "delay": 1,
+            "backoff": 2
+        },
+        "cache": {
+            "enabled": true,
+            "type": "memory",
+            "max_size": "100MB",
+            "ttl": 3600
+        }
+    }
+} 

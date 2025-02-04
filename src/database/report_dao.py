@@ -1,14 +1,35 @@
-from typing import List, Optional, Dict, Any
+"""报告数据访问对象模块。"""
+
+from typing import List, Optional, Dict, Any, Tuple
 from datetime import datetime, timedelta
 from sqlalchemy import desc
+from sqlalchemy.orm import Session
+from sqlalchemy.sql import func
+from pydantic import BaseModel
 from .base_dao import BaseDAO
-from ..models.report import Report
-from ..models.content import Content
+from ..models import Report, Content, report_contents
 
-class ReportDAO(BaseDAO):
-    """报告DAO类"""
-    
+class ReportCreate(BaseModel):
+    """报告创建模型"""
+    title: str
+    summary: str
+    report_type: str
+    report_date: datetime
+    status: int = 0
+
+class ReportUpdate(BaseModel):
+    """报告更新模型"""
+    title: Optional[str] = None
+    summary: Optional[str] = None
+    report_type: Optional[str] = None
+    report_date: Optional[datetime] = None
+    status: Optional[int] = None
+
+class ReportDAO(BaseDAO[Report, ReportCreate, ReportUpdate]):
+    """报告数据访问对象"""
+
     def __init__(self):
+        """初始化报告数据访问对象"""
         super().__init__(Report)
     
     def create_report(self, data: Dict[str, Any], content_ids: List[int]) -> Optional[Report]:

@@ -15,7 +15,7 @@ class CacheEvent:
         event_type: str,
         key: str,
         value: Optional[Any] = None,
-        ttl: Optional[int] = None,
+        ttl: Optional[float] = None,
         version: int = 1,
         timestamp: Optional[float] = None
     ):
@@ -251,14 +251,6 @@ class CacheSyncManager:
     async def _handle_delete_event(self, event: CacheEvent) -> None:
         """处理删除事件"""
         try:
-            # 检查版本
-            current_version = self._versions.get(event.key, 0)
-            if event.version <= current_version:
-                return
-                
-            # 更新版本
-            self._versions[event.key] = event.version
-            
             # 删除远程缓存
             await self.remote_cache.delete(event.key)
             
@@ -289,13 +281,4 @@ class CacheSyncManager:
         Args:
             event: 缓存事件
         """
-        # 处理事件
-        if event.event_type == "set":
-            await self._handle_set_event(event)
-        elif event.event_type == "delete":
-            await self._handle_delete_event(event)
-        elif event.event_type == "clear":
-            await self._handle_clear_event(event)
-            
-        # 发布事件
         await self.event_bus.publish(event) 

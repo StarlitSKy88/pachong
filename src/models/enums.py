@@ -11,7 +11,10 @@ class ContentType(str, PyEnum):
 
 class ContentStatus(str, PyEnum):
     """内容状态枚举。"""
+    PENDING = "pending"  # 待处理
     DRAFT = "draft"  # 草稿
+    REVIEWING = "reviewing"  # 审核中
     PUBLISHED = "published"  # 已发布
     ARCHIVED = "archived"  # 已归档
+    REJECTED = "rejected"  # 已拒绝
     DELETED = "deleted"  # 已删除 

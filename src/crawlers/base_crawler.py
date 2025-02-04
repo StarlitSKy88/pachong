@@ -228,4 +228,17 @@ class BaseCrawler(ABC):
         Returns:
             List[Any]: 爬取到的内容列表
         """
-        pass 
+        pass
+
+    async def request(self, url: str, method: str = 'GET', **kwargs) -> Optional[Dict]:
+        """发送请求
+        
+        Args:
+            url: 请求地址
+            method: 请求方法
+            **kwargs: 请求参数
+            
+        Returns:
+            响应数据
+        """
+        return await self.safe_request(method, url, **kwargs) 

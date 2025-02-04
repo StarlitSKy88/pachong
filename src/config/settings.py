@@ -209,6 +209,15 @@ class Settings(BaseSettings):
             }
         }
 
+    def get_database_url(self) -> str:
+        """获取数据库URL。"""
+        if self.DB_TYPE == "sqlite":
+            return self.SQLITE_URL
+        elif self.DB_TYPE == "mysql":
+            return f"mysql+pymysql://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
+        else:
+            raise ValueError(f"Unsupported database type: {self.DB_TYPE}")
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

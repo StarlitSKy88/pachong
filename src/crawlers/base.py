@@ -17,6 +17,7 @@ from tenacity import (
     stop_after_attempt,
     wait_exponential,
 )
+from fake_useragent import UserAgent
 
 from src.config.settings import Settings
 from src.utils.error_handler import CrawlerError
@@ -25,42 +26,11 @@ from src.utils.error_handler import CrawlerError
 class BaseCrawler(ABC):
     """爬虫基类。"""
 
-    def __init__(
-        self,
-        settings: Settings,
-        session: Optional[ClientSession] = None,
-        proxy: Optional[str] = None,
-        headers: Optional[Dict[str, str]] = None,
-        cookies: Optional[Dict[str, str]] = None,
-        timeout: int = 30,
-        retry_times: int = 3,
-        retry_delay: int = 1,
-        max_concurrent: int = 3,
-    ):
-        """初始化爬虫。
-
-        Args:
-            settings: 配置对象
-            session: aiohttp会话对象
-            proxy: 代理地址
-            headers: 请求头
-            cookies: Cookie
-            timeout: 超时时间（秒）
-            retry_times: 重试次数
-            retry_delay: 重试延迟（秒）
-            max_concurrent: 最大并发数
-        """
-        self.settings = settings
-        self.session = session
-        self.proxy = proxy
-        self.headers = headers or self._get_default_headers()
-        self.cookies = cookies or {}
-        self.timeout = timeout
-        self.retry_times = retry_times
-        self.retry_delay = retry_delay
-        self.max_concurrent = max_concurrent
-        self.semaphore = asyncio.Semaphore(max_concurrent)
-        self.visited_urls: Set[str] = set()
+    def __init__(self):
+        """初始化爬虫。"""
+        self.ua = UserAgent()
+        self.session = None
+        self.headers = self._get_default_headers()
 
     @abstractmethod
     async def start(self) -> None:
@@ -83,13 +53,12 @@ class BaseCrawler(ABC):
     async def _init_session(self) -> None:
         """初始化会话。"""
         if not self.session:
-            timeout = ClientTimeout(total=self.timeout)
+            timeout = ClientTimeout(total=30)
             connector = TCPConnector(ssl=False)
             self.session = ClientSession(
                 timeout=timeout,
                 connector=connector,
                 headers=self.headers,
-                cookies=self.cookies,
             )
 
     async def _close_session(self) -> None:
@@ -104,7 +73,7 @@ class BaseCrawler(ABC):
             默认请求头
         """
         return {
-            "User-Agent": self._get_random_ua(),
+            "User-Agent": self.ua.random,
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
             "Accept-Language": "zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2",
             "Accept-Encoding": "gzip, deflate",
@@ -204,7 +173,7 @@ class BaseCrawler(ABC):
                 request_headers.update(headers)
 
             # 更新Cookie
-            request_cookies = self.cookies.copy()
+            request_cookies = self.cookies or {}
             if cookies:
                 request_cookies.update(cookies)
 
@@ -212,7 +181,7 @@ class BaseCrawler(ABC):
             request_proxy = proxy or self.proxy or await self._get_proxy()
 
             # 设置超时
-            request_timeout = ClientTimeout(total=timeout or self.timeout)
+            request_timeout = ClientTimeout(total=timeout or 30)
 
             async with self.semaphore:
                 async with self.session.request(
@@ -388,4 +357,17 @@ class BaseCrawler(ABC):
             exc_val: 异常值
             exc_tb: 异常回溯
         """
-        await self._close_session() 
+        await self._close_session()
+
+    @abstractmethod
+    async def search(self, keyword: str, **kwargs) -> List[Dict[str, Any]]:
+        """搜索内容
+        
+        Args:
+            keyword: 搜索关键词
+            **kwargs: 其他参数
+            
+        Returns:
+            搜索结果列表
+        """
+        pass 

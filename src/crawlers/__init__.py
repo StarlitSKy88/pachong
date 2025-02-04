@@ -1,12 +1,6 @@
-"""
-Crawler implementations for different platforms
-"""
-from .base_crawler import BaseCrawler
-from .xiaohongshu.crawler import XiaoHongShuCrawler
-from .bilibili.crawler import BiliBiliCrawler
+"""爬虫包初始化文件。"""
 
-__all__ = [
-    'BaseCrawler',
-    'XiaoHongShuCrawler',
-    'BiliBiliCrawler'
-] 
+from .bilibili_crawler import BiliBiliCrawler as BilibiliCrawler
+from .xhs_crawler import XHSCrawler as XiaohongshuCrawler
+
+__all__ = ["BilibiliCrawler", "XiaohongshuCrawler"] 

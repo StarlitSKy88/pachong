@@ -1,15 +1,17 @@
-"""B站爬虫实现"""
-
-import json
+"""B站爬虫"""
+import asyncio
 import logging
-from typing import Dict, List, Any, Optional
+from typing import List, Dict, Any, Optional
 from datetime import datetime
-from urllib.parse import urljoin
-import aiohttp
+import json
+import re
 
-from src.models.content import Content
-from src.crawlers.base_crawler import BaseCrawler
-from src.utils.headers_manager import HeadersManager
+import aiohttp
+from loguru import logger
+
+from ...models import Content
+from ...utils.headers_manager import HeadersManager
+from ..base import BaseCrawler
 
 logger = logging.getLogger(__name__)
 

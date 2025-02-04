@@ -4,20 +4,46 @@ from typing import List, Dict, Any, Optional, Tuple, Union
 from datetime import datetime
 from sqlalchemy import desc, and_, func, or_
 from sqlalchemy.orm import Session
+from sqlalchemy.sql import func
+from pydantic import BaseModel
+from ..models import Content, ContentStatus, ContentType, Platform, Tag
 from .base_dao import BaseDAO
-from ..models.content import Content, ContentStatus, ContentType, Platform, Tag
 from ..utils.error_handler import DatabaseError, NotFoundError
 
-class ContentDAO(BaseDAO):
+class ContentCreate(BaseModel):
+    """内容创建模型"""
+    title: str
+    content: str
+    summary: Optional[str] = None
+    url: str
+    platform_id: int
+    content_type: ContentType
+    publish_time: datetime
+    status: ContentStatus = ContentStatus.PENDING
+    is_original: bool = True
+    is_premium: bool = False
+    score: float = 0.0
+
+class ContentUpdate(BaseModel):
+    """内容更新模型"""
+    title: Optional[str] = None
+    content: Optional[str] = None
+    summary: Optional[str] = None
+    url: Optional[str] = None
+    platform_id: Optional[int] = None
+    content_type: Optional[ContentType] = None
+    publish_time: Optional[datetime] = None
+    status: Optional[ContentStatus] = None
+    is_original: Optional[bool] = None
+    is_premium: Optional[bool] = None
+    score: Optional[float] = None
+
+class ContentDAO(BaseDAO[Content, ContentCreate, ContentUpdate]):
     """内容数据访问对象。"""
     
-    def __init__(self, session: Session):
-        """初始化内容数据访问对象。
-
-        Args:
-            session: 数据库会话
-        """
-        super().__init__(Content, session)
+    def __init__(self):
+        """初始化内容数据访问对象。"""
+        super().__init__(Content)
     
     def add_with_tags(self, data: Dict[str, Any], tag_names: List[str]) -> Content:
         """添加内容及其标签"""

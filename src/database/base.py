@@ -4,7 +4,8 @@ from datetime import datetime
 from typing import Any, Dict, Optional, TypeVar
 
 from sqlalchemy import create_engine, Column, Integer, DateTime
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import Session, sessionmaker, declarative_base
+from sqlalchemy.ext.declarative import declared_attr
 from sqlalchemy.pool import QueuePool
 from sqlalchemy.sql import func
 

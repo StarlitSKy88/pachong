@@ -1,25 +1,40 @@
 """平台数据访问对象模块。"""
 
-from typing import Dict, List, Optional, Tuple
+from typing import List, Optional, Dict, Any, Tuple
+from datetime import datetime
 
-from sqlalchemy import func
+from sqlalchemy import and_, or_, desc
 from sqlalchemy.orm import Session
+from sqlalchemy.sql import func
+from pydantic import BaseModel
 
-from src.database.base_dao import BaseDAO
-from src.models.content import Content, Platform
+from ..models import Content, Platform
+from .base_dao import BaseDAO
 from src.utils.error_handler import DatabaseError, NotFoundError
 
 
-class PlatformDAO(BaseDAO[Platform]):
-    """平台数据访问对象。"""
+class PlatformCreate(BaseModel):
+    """平台创建模型"""
+    name: str
+    description: Optional[str] = None
+    base_url: str
+    enabled: bool = True
+    config: Optional[Dict[str, Any]] = None
 
-    def __init__(self, session: Session):
-        """初始化平台数据访问对象。
+class PlatformUpdate(BaseModel):
+    """平台更新模型"""
+    name: Optional[str] = None
+    description: Optional[str] = None
+    base_url: Optional[str] = None
+    enabled: Optional[bool] = None
+    config: Optional[Dict[str, Any]] = None
 
-        Args:
-            session: 数据库会话
-        """
-        super().__init__(Platform, session)
+class PlatformDAO(BaseDAO[Platform, PlatformCreate, PlatformUpdate]):
+    """平台数据访问对象"""
+
+    def __init__(self):
+        """初始化平台数据访问对象"""
+        super().__init__(Platform)
 
     async def get_by_name(self, name: str) -> Optional[Platform]:
         """根据名称获取平台。

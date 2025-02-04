@@ -1,9 +1,12 @@
+"""告警模块。"""
+
 from datetime import datetime, timedelta
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Union
 from enum import Enum
 import json
 import logging
-from notifier import EmailNotifier
+from src.config import Config
+from src.utils.notifier import EmailNotifier, DingTalkNotifier, WeChatNotifier
 
 class AlertSeverity(str, Enum):
     INFO = "info"
@@ -20,93 +23,82 @@ class AlertOperator(str, Enum):
     NE = "!="  # 不等于
 
 class AlertRule:
+    """告警规则"""
+
     def __init__(
         self,
-        name: str,
-        metric: str,
-        operator: AlertOperator,
+        metric_name: str,
         threshold: float,
-        severity: AlertSeverity,
-        description: str = "",
-        interval: int = 300,  # 检查间隔（秒）
-        enabled: bool = True,
-        conditions: List[Dict] = None,  # 复合条件
-        message_template: str = None  # 自定义消息模板
+        operator: str = ">",
+        duration: int = 300,  # 5分钟
+        severity: str = "warning",
     ):
-        self.name = name
-        self.metric = metric
-        self.operator = operator
+        """初始化。
+
+        Args:
+            metric_name: 指标名称
+            threshold: 阈值
+            operator: 操作符
+            duration: 持续时间（秒）
+            severity: 严重程度
+        """
+        self.metric_name = metric_name
         self.threshold = threshold
+        self.operator = operator
+        self.duration = duration
         self.severity = severity
-        self.description = description
-        self.interval = interval
-        self.enabled = enabled
-        self.conditions = conditions or []
-        self.message_template = message_template or "{description}: {metric} = {value}"
-        self.last_check_time = None
-        
-    def check_value(self, value: float) -> bool:
-        """检查值是否触发告警"""
-        if self.operator == AlertOperator.GT:
+
+    def check(self, value: float, history: List[float]) -> bool:
+        """检查是否触发告警。
+
+        Args:
+            value: 当前值
+            history: 历史值列表
+
+        Returns:
+            是否触发告警
+        """
+        if self.operator == ">":
             return value > self.threshold
-        elif self.operator == AlertOperator.LT:
+        elif self.operator == "<":
             return value < self.threshold
-        elif self.operator == AlertOperator.GE:
+        elif self.operator == ">=":
             return value >= self.threshold
-        elif self.operator == AlertOperator.LE:
+        elif self.operator == "<=":
             return value <= self.threshold
-        elif self.operator == AlertOperator.EQ:
+        elif self.operator == "==":
             return value == self.threshold
-        elif self.operator == AlertOperator.NE:
-            return value != self.threshold
-        return False
-    
-    def check_conditions(self, metrics: Dict[str, Any]) -> bool:
-        """检查复合条件"""
-        if not self.conditions:
-            return True
-            
-        for condition in self.conditions:
-            metric_value = metrics.get(condition["metric"])
-            if not metric_value:
-                continue
-                
-            rule = AlertRule(
-                name="condition",
-                metric=condition["metric"],
-                operator=condition["operator"],
-                threshold=condition["threshold"],
-                severity=self.severity
-            )
-            
-            if not rule.check_value(metric_value.value):
-                return False
-        
-        return True
-    
-    def format_message(self, value: float) -> str:
-        """格式化告警消息"""
-        return self.message_template.format(
-            name=self.name,
-            description=self.description,
-            metric=self.metric,
-            value=value,
-            threshold=self.threshold,
-            operator=self.operator
-        )
+        else:
+            return False
 
 class Alert:
     def __init__(self, rule: AlertRule, value: float, timestamp: datetime = None):
         self.rule = rule
         self.value = value
         self.timestamp = timestamp or datetime.now()
-        self.message = rule.format_message(value)
+        self.message = self.rule.format_message(value)
+
+    def format_message(self, value: float) -> str:
+        """格式化告警消息"""
+        return self.rule.format_message(value)
 
 class AlertEngine:
-    def __init__(self):
-        self.rules: List[AlertRule] = []
-        self.alerts: List[Alert] = []
-        self.notifier = None
+    """告警引擎"""
+
+    def __init__(self, config: Config):
+        """初始化。
+
+        Args:
+            config: 配置对象
+        """
+        self.config = config
+        self.rules: Dict[str, AlertRule] = {}
+        self.notifiers = {
+            "email": EmailNotifier(config),
+            "dingtalk": DingTalkNotifier(config),
+            "wechat": WeChatNotifier(config),
+        }
+        self.alert_history: Dict[str, List[datetime]] = {}
         self._load_default_rules()
         
     def _load_default_rules(self):
@@ -114,172 +106,145 @@ class AlertEngine:
         default_rules = [
             # 系统资源告警规则
             AlertRule(
-                name="高CPU使用率",
-                metric="system.cpu.usage",
-                operator=AlertOperator.GT,
+                metric_name="system.cpu.usage",
                 threshold=80,
-                severity=AlertSeverity.ERROR,
-                description="CPU使用率超过80%",
-                interval=300
+                severity=AlertSeverity.ERROR
             ),
             AlertRule(
-                name="高内存使用率",
-                metric="system.memory.percent",
-                operator=AlertOperator.GT,
+                metric_name="system.memory.percent",
                 threshold=80,
-                severity=AlertSeverity.ERROR,
-                description="内存使用率超过80%",
-                interval=300
+                severity=AlertSeverity.ERROR
             ),
             AlertRule(
-                name="高磁盘使用率",
-                metric="system.disk.percent",
-                operator=AlertOperator.GT,
+                metric_name="system.disk.percent",
                 threshold=80,
-                severity=AlertSeverity.ERROR,
-                description="磁盘使用率超过80%",
-                interval=300
+                severity=AlertSeverity.ERROR
             ),
             
             # 爬虫相关告警规则
             AlertRule(
-                name="爬取速率过低",
-                metric="crawler.xhs.content.rate",
-                operator=AlertOperator.LT,
+                metric_name="crawler.xhs.content.rate",
                 threshold=5,
-                severity=AlertSeverity.WARNING,
-                description="小红书爬取速率低于5条/小时",
-                interval=3600,
-                conditions=[
-                    {
-                        "metric": "task.running",
-                        "operator": AlertOperator.GT,
-                        "threshold": 0
-                    }
-                ]
+                severity=AlertSeverity.WARNING
             ),
             AlertRule(
-                name="爬取速率过低",
-                metric="crawler.bilibili.content.rate",
-                operator=AlertOperator.LT,
+                metric_name="crawler.bilibili.content.rate",
                 threshold=5,
-                severity=AlertSeverity.WARNING,
-                description="B站爬取速率低于5条/小时",
-                interval=3600,
-                conditions=[
-                    {
-                        "metric": "task.running",
-                        "operator": AlertOperator.GT,
-                        "threshold": 0
-                    }
-                ]
+                severity=AlertSeverity.WARNING
             ),
             
             # 任务相关告警规则
             AlertRule(
-                name="低任务成功率",
-                metric="task.success_rate",
-                operator=AlertOperator.LT,
+                metric_name="task.success_rate",
                 threshold=0.8,
-                severity=AlertSeverity.ERROR,
-                description="任务成功率低于80%",
-                interval=1800
+                severity=AlertSeverity.ERROR
             ),
             AlertRule(
-                name="任务积压",
-                metric="task.running",
-                operator=AlertOperator.GT,
+                metric_name="task.running",
                 threshold=100,
-                severity=AlertSeverity.WARNING,
-                description="运行中任务数超过100",
-                interval=600
+                severity=AlertSeverity.WARNING
             ),
             
             # 错误相关告警规则
             AlertRule(
-                name="高错误率",
-                metric="crawler.error.count",
-                operator=AlertOperator.GT,
+                metric_name="crawler.error.count",
                 threshold=50,
-                severity=AlertSeverity.ERROR,
-                description="错误数量超过50",
-                interval=900
+                severity=AlertSeverity.ERROR
             )
         ]
         
         for rule in default_rules:
             self.add_rule(rule)
     
-    def add_rule(self, rule: AlertRule):
-        """添加告警规则"""
-        self.rules.append(rule)
-    
-    def remove_rule(self, rule_name: str):
-        """删除告警规则"""
-        self.rules = [r for r in self.rules if r.name != rule_name]
-    
-    def enable_rule(self, rule_name: str):
-        """启用告警规则"""
-        for rule in self.rules:
-            if rule.name == rule_name:
-                rule.enabled = True
-                break
-    
-    def disable_rule(self, rule_name: str):
-        """禁用告警规则"""
-        for rule in self.rules:
-            if rule.name == rule_name:
-                rule.enabled = False
-                break
-    
-    def add_alert(self, alert: Alert):
-        """添加告警"""
-        self.alerts.append(alert)
-    
-    def setup_email_notifier(self, smtp_host: str, smtp_port: int, username: str, password: str, to_addr: str):
+    def add_rule(self, rule: AlertRule) -> None:
+        """添加告警规则。
+
+        Args:
+            rule: 告警规则
         """
-        设置邮件通知器
-        """
-        self.notifier = EmailNotifier(smtp_host, smtp_port, username, password)
-        self.to_addr = to_addr
+        self.rules[rule.metric_name] = rule
     
-    def check_rules(self, metrics: Dict[str, Any]) -> List[Alert]:
-        """检查所有规则并生成告警"""
-        current_time = datetime.now()
-        new_alerts = []
-        
-        for rule in self.rules:
-            if not rule.enabled:
-                continue
-                
-            # 检查是否到达检查间隔
-            if (rule.last_check_time and 
-                (current_time - rule.last_check_time).total_seconds() < rule.interval):
-                continue
-            
-            metric = metrics.get(rule.metric)
-            if not metric:
-                continue
-            
-            # 检查值和复合条件
-            if (rule.check_value(metric.value) and 
-                rule.check_conditions(metrics)):
-                alert = Alert(rule, metric.value, current_time)
-                self.add_alert(alert)
-                new_alerts.append(alert)
-            
-            rule.last_check_time = current_time
-        
-        # 如果有新告警且配置了通知器，发送通知
-        if new_alerts and self.notifier:
-            alerts_data = [{
-                'rule': alert.rule,
-                'value': alert.value,
-                'timestamp': alert.timestamp
-            } for alert in new_alerts]
-            self.notifier.send_alert(self.to_addr, alerts_data)
-        
-        return new_alerts
+    def remove_rule(self, metric_name: str) -> None:
+        """移除告警规则。
+
+        Args:
+            metric_name: 指标名称
+        """
+        if metric_name in self.rules:
+            del self.rules[metric_name]
+    
+    def check_alert(
+        self,
+        metric_name: str,
+        value: float,
+        history: Optional[List[float]] = None,
+    ) -> bool:
+        """检查是否需要告警。
+
+        Args:
+            metric_name: 指标名称
+            value: 当前值
+            history: 历史值列表
+
+        Returns:
+            是否需要告警
+        """
+        if metric_name not in self.rules:
+            return False
+
+        rule = self.rules[metric_name]
+        history = history or []
+
+        # 检查是否触发告警
+        if rule.check(value, history):
+            # 检查是否在冷却期
+            now = datetime.now()
+            if metric_name in self.alert_history:
+                last_alert = self.alert_history[metric_name][-1]
+                if (now - last_alert).total_seconds() < self.config.ALERT_COOLDOWN:
+                    return False
+
+            # 记录告警时间
+            if metric_name not in self.alert_history:
+                self.alert_history[metric_name] = []
+            self.alert_history[metric_name].append(now)
+
+            return True
+
+        return False
+
+    def send_alert(
+        self,
+        metric_name: str,
+        value: float,
+        channels: Optional[List[str]] = None,
+    ) -> None:
+        """发送告警。
+
+        Args:
+            metric_name: 指标名称
+            value: 当前值
+            channels: 通知渠道列表
+        """
+        if metric_name not in self.rules:
+            return
+
+        rule = self.rules[metric_name]
+        channels = channels or self.config.ALERT_CHANNELS
+
+        # 构造告警消息
+        subject = f"[{rule.severity.upper()}] {metric_name} Alert"
+        message = (
+            f"Metric: {metric_name}\n"
+            f"Value: {value}\n"
+            f"Threshold: {rule.operator} {rule.threshold}\n"
+            f"Time: {datetime.now()}"
+        )
+
+        # 发送告警
+        for channel in channels:
+            if channel in self.notifiers:
+                self.notifiers[channel].send(subject, message)
     
     def get_recent_alerts(self, hours: int = 24, limit: int = None) -> List[Alert]:
         """获取最近的告警"""
@@ -306,18 +271,13 @@ class AlertEngine:
     def export_rules(self, file_path: str):
         """导出告警规则到文件"""
         rules_data = []
-        for rule in self.rules:
+        for rule in self.rules.values():
             rules_data.append({
-                "name": rule.name,
-                "metric": rule.metric,
-                "operator": rule.operator,
+                "metric_name": rule.metric_name,
                 "threshold": rule.threshold,
-                "severity": rule.severity,
-                "description": rule.description,
-                "interval": rule.interval,
-                "enabled": rule.enabled,
-                "conditions": rule.conditions,
-                "message_template": rule.message_template
+                "operator": rule.operator,
+                "duration": rule.duration,
+                "severity": rule.severity
             })
         
         with open(file_path, 'w', encoding='utf-8') as f:

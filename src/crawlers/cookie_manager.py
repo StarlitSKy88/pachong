@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set
 import json
 import time
 import random
@@ -6,16 +6,17 @@ import asyncio
 from datetime import datetime, timedelta
 import aiohttp
 import logging
+from loguru import logger
 from .cookie_generator import CookieGeneratorManager, XHSCookieGenerator, BiliBiliCookieGenerator
-from ..utils.logger import get_logger
 
 class CookieManager:
     """Cookie管理器"""
     
     def __init__(self):
-        self.logger = get_logger('cookie_manager')
+        self.logger = logger.bind(name='cookie_manager')
         self.cookies = {}  # 平台 -> Cookie列表
         self.cookie_scores = {}  # Cookie -> 分数
+        self.test_url = 'http://www.baidu.com'  # 测试URL
         self.min_score = 0  # 最低分数
         self.max_score = 100  # 最高分数
         self.min_cookies = 5  # 每个平台最少Cookie数量

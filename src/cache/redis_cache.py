@@ -3,7 +3,8 @@
 import json
 import time
 import asyncio
-from typing import Dict, Any, Optional, List, Union
+from typing import Dict, Any, Optional, List, Union, AsyncContextManager
+from contextlib import asynccontextmanager
 from redis.asyncio import Redis
 from .cache_manager import BaseCache, CacheEntry
 
@@ -241,13 +242,14 @@ class RedisCache(BaseCache):
             self.logger.error(f"减少计数器失败: {str(e)}")
             return None
             
+    @asynccontextmanager
     async def acquire_lock(
         self,
         key: str,
         ttl: int = 30,
         retry_times: int = 3,
         retry_delay: float = 0.1
-    ) -> bool:
+    ) -> AsyncContextManager[bool]:
         """获取分布式锁
         
         Args:
@@ -257,33 +259,53 @@ class RedisCache(BaseCache):
             retry_delay: 重试延迟（秒）
             
         Returns:
-            bool: 是否获取成功
+            AsyncContextManager[bool]: 是否获取到锁
         """
         lock_key = f"{self.prefix}lock:{key}"
+        locked = False
         
-        for _ in range(retry_times):
+        try:
             # 尝试获取锁
-            if await self.redis.set(
-                lock_key,
-                "1",
-                nx=True,
-                ex=ttl
-            ):
-                return True
+            for _ in range(retry_times):
+                locked = await self.redis.set(
+                    lock_key,
+                    "1",
+                    nx=True,
+                    ex=ttl
+                )
+                if locked:
+                    break
+                await asyncio.sleep(retry_delay)
                 
-            # 等待后重试
-            await asyncio.sleep(retry_delay)
+            yield locked or False
             
-        return False
-        
-    async def release_lock(self, key: str) -> bool:
-        """释放分布式锁
+        finally:
+            # 释放锁
+            if locked:
+                await self.redis.delete(lock_key)
+                
+    async def scan(
+        self,
+        cursor: int = 0,
+        match: Optional[str] = None,
+        count: Optional[int] = None
+    ) -> tuple[int, List[str]]:
+        """扫描缓存键
         
         Args:
-            key: 锁键
+            cursor: 游标
+            match: 匹配模式
+            count: 每次扫描的键数量
             
         Returns:
-            bool: 是否释放成功
+            tuple[int, List[str]]: 新游标和键列表
         """
-        lock_key = f"{self.prefix}lock:{key}"
-        return await self.delete(lock_key) 
+        try:
+            return await self.redis.scan(
+                cursor=cursor,
+                match=match,
+                count=count
+            )
+        except Exception as e:
+            self.logger.error(f"扫描缓存键失败: {str(e)}")
+            return 0, [] 

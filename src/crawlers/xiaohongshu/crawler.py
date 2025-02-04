@@ -14,7 +14,7 @@ import aiohttp
 from loguru import logger
 
 from .sign import XHSSign
-from ...models.content import Content
+from ...models import Content
 from ...utils.headers_manager import HeadersManager
 
 class XiaoHongShuCrawler:
@@ -212,8 +212,8 @@ class XiaoHongShuCrawler:
                 # 发送请求
                 try:
                     response = await self.session.request(method, url, **kwargs)
-                response.raise_for_status()
-                data = await response.json()
+                    response.raise_for_status()
+                    data = await response.json()
 
                     # 报告成功
                     if self.proxy_manager and current_proxy:
@@ -223,7 +223,7 @@ class XiaoHongShuCrawler:
                     if self.rate_limiter:
                         await self.rate_limiter.report_success()
 
-                return data
+                    return data
 
                 except (aiohttp.ClientError, aiohttp.ContentTypeError) as e:
                     if self.proxy_manager and current_proxy:
@@ -234,7 +234,7 @@ class XiaoHongShuCrawler:
                         await self.rate_limiter.report_failure()
                     raise e  # 直接抛出原始异常
 
-        except Exception as e:
+            except Exception as e:
                 # 记录错误
                 self.logger.error(f"Request failed: {e}")
                 last_error = e
@@ -248,15 +248,9 @@ class XiaoHongShuCrawler:
                     should_retry = self.retry_policy.should_retry(last_error)
                     if not should_retry:
                         raise last_error
-                    
-                    delay = self.retry_policy.get_delay(retry_count)
-                    await asyncio.sleep(delay)
-                else:
-                    raise last_error
 
-            finally:
-                if self.rate_limiter:
-                    await self.rate_limiter.release()
+                # 等待重试
+                await asyncio.sleep(self.retry_policy.get_delay(retry_count) if self.retry_policy else 1)
 
     async def search(self, keyword: str) -> dict:
         """搜索笔记"""

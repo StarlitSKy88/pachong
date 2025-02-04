@@ -1,5 +1,3 @@
-"""
-Content Collection and Generation System
-"""
+"""爬虫项目包"""
 
-__version__ = "0.1.0"
+__version__ = "1.0.0"

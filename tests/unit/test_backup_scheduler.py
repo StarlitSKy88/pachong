@@ -13,6 +13,7 @@ def backup_manager():
     """创建Mock备份管理器"""
     manager = AsyncMock(spec=BackupManager)
     manager.last_full_backup = datetime.now()
+    manager.metrics_collector = None  # 初始化为None
     return manager
 
 @pytest.fixture
@@ -198,7 +199,10 @@ async def test_metrics_collection(scheduler, backup_manager):
     """测试指标收集"""
     # 创建Mock指标收集器
     metrics_collector = Mock()
+    
+    # 设置指标收集器
     scheduler.metrics_collector = metrics_collector
+    backup_manager.metrics_collector = None  # 确保初始值为None
     
     # 修改上次检查时间
     scheduler.last_full_backup_check = datetime.now() - timedelta(minutes=6)
@@ -209,7 +213,7 @@ async def test_metrics_collection(scheduler, backup_manager):
     # 等待执行
     await asyncio.sleep(0.1)
     
-    # 验证是否收集了指标
-    assert backup_manager.metrics_collector == metrics_collector
+    # 验证是否设置了指标收集器
+    assert backup_manager.metrics_collector is metrics_collector
     
     await scheduler.stop() 

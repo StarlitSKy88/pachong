@@ -97,7 +97,7 @@ class BackupManager:
             try:
                 for table in metadata.sorted_tables:
                     rows = session.execute(select(table)).fetchall()
-                    data[table.name] = [dict(row) for row in rows]
+                    data[table.name] = [dict(zip(row.keys(), row)) for row in rows]
             finally:
                 session.close()
             
@@ -133,7 +133,7 @@ class BackupManager:
             return backup_id
             
         except Exception as e:
-            logger.error(f"Full backup failed: {e}", exc_info=True)
+            logger.error(f"Full backup failed: {str(e)}", exc_info=True)
             if self.alert_engine:
                 await self.alert_engine.send_alert(
                     title="Full Backup Failed",
@@ -170,7 +170,7 @@ class BackupManager:
                         stmt = select(table)
                     rows = session.execute(stmt).fetchall()
                     if rows:
-                        data[table.name] = [dict(row) for row in rows]
+                        data[table.name] = [dict(zip(row.keys(), row)) for row in rows]
             finally:
                 session.close()
             
@@ -206,7 +206,7 @@ class BackupManager:
             return backup_id
             
         except Exception as e:
-            logger.error(f"Incremental backup failed: {e}", exc_info=True)
+            logger.error(f"Incremental backup failed: {str(e)}", exc_info=True)
             if self.alert_engine:
                 await self.alert_engine.send_alert(
                     title="Incremental Backup Failed",

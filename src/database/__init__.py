@@ -1,40 +1,29 @@
-"""
-Database models and operations
-"""
+"""数据库包初始化文件。"""
 
-from .session import async_session_factory as Session
-from .session import engine, init_database, get_session, get_db
-from .base_dao import BaseDAO
-from .content_dao import ContentDAO
+from .base import Database
+from .session import engine, init_db, get_session
 from .tag_dao import TagDAO
+from .content_dao import ContentDAO
 from .platform_dao import PlatformDAO
-from .category_dao import CategoryDAO
 from .report_dao import ReportDAO
-from .task_log_dao import TaskLogDAO
 
 __all__ = [
-    'Session',
+    'Database',
     'engine',
-    'init_database',
+    'init_db',
     'get_session',
-    'get_db',
-    'BaseDAO',
-    'ContentDAO',
     'TagDAO',
+    'ContentDAO',
     'PlatformDAO',
-    'CategoryDAO',
-    'ReportDAO',
-    'TaskLogDAO'
+    'ReportDAO'
 ]
 
 # 创建DAO实例
 content_dao = ContentDAO()
 platform_dao = PlatformDAO()
-category_dao = CategoryDAO()
 tag_dao = TagDAO()
 report_dao = ReportDAO()
-task_log_dao = TaskLogDAO()
 
 __all__.extend([
-    'content_dao', 'platform_dao', 'category_dao', 'tag_dao', 'report_dao', 'task_log_dao'
+    'content_dao', 'platform_dao', 'tag_dao', 'report_dao'
 ]) 

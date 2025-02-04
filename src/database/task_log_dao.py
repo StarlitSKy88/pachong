@@ -1,13 +1,36 @@
+"""任务日志数据访问对象模块。"""
+
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
-from sqlalchemy import desc
+from sqlalchemy import desc, and_
+from sqlalchemy.future import select
+from pydantic import BaseModel
 from .base_dao import BaseDAO
-from ..models.task_log import TaskLog
+from ..models import TaskLog
 
-class TaskLogDAO(BaseDAO):
-    """任务日志DAO类"""
+class TaskLogCreate(BaseModel):
+    """任务日志创建模型"""
+    task_id: int
+    status: str
+    start_time: datetime
+    end_time: Optional[datetime] = None
+    duration: Optional[int] = None
+    error: Optional[str] = None
+    result: Optional[dict] = None
+
+class TaskLogUpdate(BaseModel):
+    """任务日志更新模型"""
+    status: Optional[str] = None
+    end_time: Optional[datetime] = None
+    duration: Optional[int] = None
+    error: Optional[str] = None
+    result: Optional[dict] = None
+
+class TaskLogDAO(BaseDAO[TaskLog, TaskLogCreate, TaskLogUpdate]):
+    """任务日志数据访问对象"""
     
     def __init__(self):
+        """初始化任务日志数据访问对象。"""
         super().__init__(TaskLog)
     
     def create_log(self, task_id: str, task_type: str, platform: Optional[str] = None) -> TaskLog:
@@ -117,4 +140,79 @@ class TaskLogDAO(BaseDAO):
                 'type_stats': {t[0]: t[1] for t in type_stats},
                 'status_stats': {s[0]: s[1] for s in status_stats},
                 'platform_stats': {p[0]: p[1] for p in platform_stats}
-            } 
+            }
+
+    async def get_logs_by_task_id(self, task_id: int) -> List[TaskLog]:
+        """获取任务的日志列表。
+
+        Args:
+            task_id: 任务ID
+
+        Returns:
+            任务日志列表
+        """
+        query = select(TaskLog).where(TaskLog.task_id == task_id).order_by(desc(TaskLog.create_time))
+        result = await self.session.execute(query)
+        return result.scalars().all()
+
+    async def get_logs_by_time_range(
+        self,
+        start_time: datetime,
+        end_time: datetime
+    ) -> List[TaskLog]:
+        """获取时间范围内的日志列表。
+
+        Args:
+            start_time: 开始时间
+            end_time: 结束时间
+
+        Returns:
+            任务日志列表
+        """
+        query = select(TaskLog).where(
+            and_(
+                TaskLog.create_time >= start_time,
+                TaskLog.create_time <= end_time
+            )
+        ).order_by(desc(TaskLog.create_time))
+        result = await self.session.execute(query)
+        return result.scalars().all()
+
+    async def get_failed_logs_by_time_range(
+        self,
+        start_time: datetime,
+        end_time: datetime
+    ) -> List[TaskLog]:
+        """获取时间范围内的失败日志列表。
+
+        Args:
+            start_time: 开始时间
+            end_time: 结束时间
+
+        Returns:
+            失败的任务日志列表
+        """
+        query = select(TaskLog).where(
+            and_(
+                TaskLog.create_time >= start_time,
+                TaskLog.create_time <= end_time,
+                TaskLog.status == 'failed'
+            )
+        ).order_by(desc(TaskLog.create_time))
+        result = await self.session.execute(query)
+        return result.scalars().all()
+
+    async def get_latest_log(self, task_id: int) -> Optional[TaskLog]:
+        """获取任务的最新日志。
+
+        Args:
+            task_id: 任务ID
+
+        Returns:
+            最新的任务日志，如果不存在则返回None
+        """
+        query = select(TaskLog).where(
+            TaskLog.task_id == task_id
+        ).order_by(desc(TaskLog.create_time)).limit(1)
+        result = await self.session.execute(query)
+        return result.scalar_one_or_none() 

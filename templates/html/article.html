@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <style>
+        /* 基础样式 */
+        :root {
+            --primary-color: #1a73e8;
+            --text-color: #202124;
+            --bg-color: #ffffff;
+            --border-color: #dadce0;
+            --hover-color: #f8f9fa;
+        }
+
+        /* 暗色模式 */
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --primary-color: #8ab4f8;
+                --text-color: #e8eaed;
+                --bg-color: #202124;
+                --border-color: #3c4043;
+                --hover-color: #303134;
+            }
+        }
+
+        /* 全局样式 */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            background-color: var(--bg-color);
+            padding: 2rem;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        /* 标题样式 */
+        h1, h2, h3, h4, h5, h6 {
+            margin: 2rem 0 1rem;
+            line-height: 1.3;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            border-bottom: 2px solid var(--primary-color);
+            padding-bottom: 0.5rem;
+        }
+
+        /* 元信息样式 */
+        .meta {
+            color: #666;
+            font-size: 0.9rem;
+            margin: 1rem 0 2rem;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .meta span {
+            margin-right: 1rem;
+        }
+
+        /* 内容样式 */
+        .content {
+            margin: 2rem 0;
+        }
+
+        p {
+            margin: 1rem 0;
+        }
+
+        /* 图片样式 */
+        img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 4px;
+            margin: 1rem 0;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        /* 链接样式 */
+        a {
+            color: var(--primary-color);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+
+        /* 引用样式 */
+        blockquote {
+            margin: 1rem 0;
+            padding: 1rem;
+            border-left: 4px solid var(--primary-color);
+            background-color: var(--hover-color);
+            font-style: italic;
+        }
+
+        /* 代码样式 */
+        pre, code {
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            background-color: var(--hover-color);
+            border-radius: 4px;
+        }
+
+        code {
+            padding: 0.2em 0.4em;
+            font-size: 0.9em;
+        }
+
+        pre {
+            padding: 1rem;
+            overflow-x: auto;
+            margin: 1rem 0;
+        }
+
+        pre code {
+            padding: 0;
+            background-color: transparent;
+        }
+
+        /* 列表样式 */
+        ul, ol {
+            margin: 1rem 0;
+            padding-left: 2rem;
+        }
+
+        li {
+            margin: 0.5rem 0;
+        }
+
+        /* 表格样式 */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+        }
+
+        th, td {
+            padding: 0.5rem;
+            border: 1px solid var(--border-color);
+            text-align: left;
+        }
+
+        th {
+            background-color: var(--hover-color);
+            font-weight: 600;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 600px) {
+            body {
+                padding: 1rem;
+            }
+
+            h1 {
+                font-size: 2rem;
+            }
+
+            .meta span {
+                display: block;
+                margin: 0.5rem 0;
+            }
+        }
+
+        /* 打印样式 */
+        @media print {
+            body {
+                padding: 0;
+                max-width: none;
+            }
+
+            img {
+                max-width: 100% !important;
+                page-break-inside: avoid;
+            }
+
+            pre, blockquote {
+                page-break-inside: avoid;
+            }
+
+            h1, h2, h3, h4, h5, h6 {
+                page-break-after: avoid;
+            }
+        }
+    </style>
+</head>
+<body>
+    <article>
+        <h1>{{ title }}</h1>
+        
+        <div class="meta">
+            {% if author %}
+            <span class="author">作者：{{ author }}</span>
+            {% endif %}
+            
+            {% if date %}
+            <span class="date">发布时间：{{ date }}</span>
+            {% endif %}
+            
+            {% if category %}
+            <span class="category">分类：{{ category }}</span>
+            {% endif %}
+            
+            {% if tags %}
+            <span class="tags">标签：{{ tags|join(', ') }}</span>
+            {% endif %}
+        </div>
+        
+        <div class="content">
+            {{ content|safe }}
+        </div>
+    </article>
+</body>
+</html> 

@@ -1,9 +1,12 @@
+"""监控指标模块。"""
+
 import psutil
 import time
 from datetime import datetime, timedelta
 from collections import defaultdict, deque
 from typing import Dict, Any, List
-from models.metrics import get_session, MetricRecord
+
+from src.models.metrics import get_session, MetricRecord
 
 class Metric:
     def __init__(self, value: float, timestamp: datetime = None):

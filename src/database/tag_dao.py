@@ -1,25 +1,40 @@
 """标签数据访问对象模块。"""
 
-from typing import Dict, List, Optional, Tuple
+from typing import List, Optional, Dict, Any, Tuple
+from datetime import datetime
 
-from sqlalchemy import and_, func
-from sqlalchemy.orm import Session, aliased
+from sqlalchemy import and_, or_, desc
+from sqlalchemy.orm import Session
+from sqlalchemy.sql import func
+from pydantic import BaseModel
 
-from src.database.base_dao import BaseDAO
-from src.models.content import Content, Tag, content_tags
+from ..models import Content, Tag, content_tags
+from .base_dao import BaseDAO
 from src.utils.error_handler import DatabaseError, NotFoundError
 
 
-class TagDAO(BaseDAO[Tag]):
-    """标签数据访问对象。"""
+class TagCreate(BaseModel):
+    """标签创建模型"""
+    name: str
+    description: Optional[str] = None
+    parent_id: Optional[int] = None
+    level: int = 0
+    weight: float = 1.0
 
-    def __init__(self, session: Session):
-        """初始化标签数据访问对象。
+class TagUpdate(BaseModel):
+    """标签更新模型"""
+    name: Optional[str] = None
+    description: Optional[str] = None
+    parent_id: Optional[int] = None
+    level: Optional[int] = None
+    weight: Optional[float] = None
 
-        Args:
-            session: 数据库会话
-        """
-        super().__init__(Tag, session)
+class TagDAO(BaseDAO[Tag, TagCreate, TagUpdate]):
+    """标签数据访问对象"""
+
+    def __init__(self):
+        """初始化标签数据访问对象。"""
+        super().__init__(Tag)
 
     async def get_by_name(self, name: str) -> Optional[Tag]:
         """根据名称获取标签。

@@ -9,6 +9,11 @@ from sqlalchemy.ext.declarative import declarative_base
 # 创建基类
 Base = declarative_base()
 
+class TimestampMixin:
+    """时间戳混入类"""
+    create_time = Column(DateTime, default=func.now())
+    update_time = Column(DateTime, default=func.now(), onupdate=func.now())
+
 class BaseModel(Base):
     """基础模型类"""
 
