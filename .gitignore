@@ -25,7 +25,6 @@ MANIFEST
 venv/
 ENV/
 env/
-.env
 
 # IDE
 .idea/
@@ -39,65 +38,84 @@ env/
 .vs/
 .cursor/
 
-# Logs and databases
+# Data directories
 data/logs/*
 !data/logs/.gitkeep
 data/db/*
 !data/db/.gitkeep
+data/output/*
+!data/output/.gitkeep
+data/cache/*
+!data/cache/.gitkeep
+data/downloads/*
+!data/downloads/.gitkeep
+data/reports/*
+!data/reports/.gitkeep
+
+# Logs and databases
 *.log
 *.sqlite3
 *.db
 
-# Output files
-data/output/*
-!data/output/.gitkeep
-output/
-htmlcov/
-
 # Test coverage
 .coverage
+.coverage.*
 coverage.xml
+htmlcov/
 .pytest_cache/
 .tox/
+.nox/
+nosetests.xml
+.hypothesis/
 
-# Environment variables
+# Config files
 config/env/.env
-config/env/.env.example
+config/env/.env.*
+!config/env/.env.example
 config/test/.env.test
+config/*.json
+!config/*.example.json
+local_settings.py
+
+# Development
+config/dev/*
+!config/dev/.gitkeep
+*.local
+.local/
+local_settings.py
+
+# Media and uploads
+media/
+uploads/
 
 # Temporary files
 *.tmp
 *.temp
+*.bak
+*.backup
+*~
 .DS_Store
 Thumbs.db
-
-# Documentation
-docs/_build/
-docs/api/
 
 # Dependencies
 node_modules/
 package-lock.json
 yarn.lock
 
+# Documentation
+docs/_build/
+docs/api/
+
 # Deployment
 deploy/local/
 .vercel
 .netlify
 
-# Cache
-.cache/
-__pycache__/
-.mypy_cache/
-.pytest_cache/
-
 # Docker
 .docker/
 docker-compose.override.yml
-
-# Local development
-*.local
-.local/
+*.pid
+*.socket
 
 # Security
 *.pem
@@ -107,116 +125,6 @@ docker-compose.override.yml
 *.p12
 *.pfx
 
-# Backup files
-*.bak
-*.backup
-*~
-
-# 其他
-*.bak
-*.swp
-*.swo
-*~
-.env
-config.local.yaml
-
-# Data directories
-data/logs/*
-!data/logs/.gitkeep
-data/output/*
-!data/output/.gitkeep
-data/cache/*
-!data/cache/.gitkeep
-data/downloads/*
-!data/downloads/.gitkeep
-
-# Config files
-config/env/.env
-!config/env/.env.example
-
-# Development reports
-data/reports/*
-!data/reports/.gitkeep
-
-# Development configs
-config/dev/*
-!config/dev/.gitkeep
-
-# Project specific
-.env
-*.log
-logs/
-data/
-.coverage
-htmlcov/
-.pytest_cache/
-.mypy_cache/
-
-# Database
-*.db
-*.sqlite3
-
-# Cache
-.cache/
-
-# Logs
-logs/
-*.log
-
-# Environment variables
-.env
-.env.*
-!.env.example
-
-# Test coverage
-.coverage
-htmlcov/
-.tox/
-.nox/
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-.hypothesis/
-
 # Project specific
 storage/
 temp/
-*.bak
-*.tmp
-*.old
-
-# System
-.DS_Store
-Thumbs.db
-
-# Project specific
-config/*.json
-!config/*.example.json
-output/
-data/
-*.pid
-*.socket
-
-# Local development settings
-local_settings.py
-
-# Media files
-media/
-uploads/
-
-# Temporary files
-*.tmp
-*.temp
-
-# Coverage reports
-htmlcov/
-.coverage
-.coverage.*
-coverage.xml
-*.cover
-
-# Project specific
-data/proxies.json
-config/env/.env

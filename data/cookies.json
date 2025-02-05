@@ -1,0 +1,8 @@
+{
+    "xhs": [
+        "webId=1234567890; webVersion=2.0.0; a1=18f12345678901234567890123456789; gid=abcdef12-3456-7890-abcd-ef1234567890; timestamp=1234567890"
+    ],
+    "bilibili": [
+        "SESSDATA=abcd1234%2C1234567890%2C12345%2A12; bili_jct=1234567890abcdef1234567890abcdef; DedeUserID=12345678"
+    ]
+} 
