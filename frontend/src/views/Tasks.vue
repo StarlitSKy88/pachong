@@ -1,1 +1,1 @@
-<template><div class="tasks"><h2>хннЯап╠М</h2></div></template><script>export default { name: "Tasks" }</script>
+<template><div class="tasks"><h2>О©╫О©╫О©╫О©╫О©╫п╠О©╫</h2></div></template><script>export default { name: "Tasks" }</script>

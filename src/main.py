@@ -2,37 +2,35 @@ from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import JSONResponse
-import uvicorn
 from typing import Dict, Any, List
 import json
 from datetime import datetime
 import os
 import sys
 from loguru import logger
+from src.database import init_db
+from src.config import settings
+from src.utils.logger import setup_logger
 
 # 配置日志
-logger.remove()  # 移除默认的处理器
-logger.add(
-    sink=sys.stderr,
-    level="DEBUG",
-    format="<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>"
+setup_logger(
+    name="crawler",
+    level=settings.LOG_LEVEL,
+    log_path=settings.LOG_DIR / "api.log"
 )
 
 # 创建应用
 app = FastAPI(
-    title="爬虫工具API",
+    title=settings.APP_NAME,
     description="提供各种爬虫工具的API接口",
-    version="1.0.0",
-    debug=False  # 生产环境禁用调试模式
+    version=settings.APP_VERSION,
+    debug=settings.DEBUG
 )
 
 # CORS配置
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",  # 本地开发环境
-        "https://your-app.vercel.app",  # Vercel 部署的域名（需要替换）
-    ],
+    allow_origins=["*"],  # 简化CORS配置
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -41,19 +39,31 @@ app.add_middleware(
 @app.on_event("startup")
 async def startup_event():
     """服务启动时的事件处理"""
-    logger.info("API服务正在启动...")
-    logger.info(f"环境: {os.getenv('VERCEL_ENV', 'local')}")
-    logger.info(f"区域: {os.getenv('VERCEL_REGION', 'local')}")
-    logger.info("API服务启动完成")
+    try:
+        logger.info("API服务正在启动...")
+        
+        # 初始化数据库
+        logger.info("正在初始化数据库...")
+        await init_db()
+        logger.info("数据库初始化完成")
+        
+        # 其他初始化工作
+        logger.info(f"环境: {settings.APP_ENV}")
+        logger.info(f"调试模式: {settings.DEBUG}")
+        logger.info(f"数据库类型: {settings.DB_TYPE}")
+        logger.info("API服务启动完成")
+    except Exception as e:
+        logger.error(f"服务启动失败: {str(e)}")
+        raise e
 
 @app.get("/")
 async def root():
     """根路径"""
     return {
-        "message": "爬虫工具API服务正在运行",
+        "message": f"{settings.APP_NAME} API服务正在运行",
+        "version": settings.APP_VERSION,
         "time": datetime.now().isoformat(),
-        "environment": os.getenv("VERCEL_ENV", "local"),
-        "region": os.getenv("VERCEL_REGION", "local")
+        "environment": settings.APP_ENV
     }
 
 @app.get("/health")
@@ -62,9 +72,9 @@ async def health_check():
     return {
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
-        "version": "1.0.0",
-        "environment": os.getenv("VERCEL_ENV", "local"),
-        "region": os.getenv("VERCEL_REGION", "local")
+        "version": settings.APP_VERSION,
+        "environment": settings.APP_ENV,
+        "database": settings.DB_TYPE
     }
 
 @app.exception_handler(Exception)
@@ -72,30 +82,39 @@ async def global_exception_handler(request: Request, exc: Exception):
     """全局异常处理"""
     error_msg = f"发生错误: {str(exc)}"
     logger.error(error_msg)
+    logger.exception(exc)
+    
+    status_code = 500
+    if isinstance(exc, HTTPException):
+        status_code = exc.status_code
+    
     return JSONResponse(
-        status_code=500,
+        status_code=status_code,
         content={
             "detail": str(exc),
             "timestamp": datetime.now().isoformat(),
-            "path": str(request.url)
+            "path": str(request.url),
+            "status_code": status_code
         }
     )
 
+# 在这里注册路由模块
+# from src.api import router as api_router
+# app.include_router(api_router, prefix="/api/v1")
+
 if __name__ == "__main__":
+    import uvicorn
+    
     try:
-        # 启动服务器
-        logger.info("正在启动服务器...")
-        
-        # 使用最简单的配置
+        logger.info("正在启动开发服务器...")
         uvicorn.run(
-            app,  # 直接使用 app 实例
-            host="0.0.0.0",  # 修改为监听所有网络接口
-            port=9000,
-            log_level="debug",
-            reload=False  # 禁用热重载以避免编码问题
+            "src.main:app",
+            host="0.0.0.0",  # 直接使用固定值
+            port=8888,       # 直接使用固定值
+            log_level="info",
+            reload=False
         )
-        
     except Exception as e:
         logger.error(f"服务器启动失败: {str(e)}")
-        logger.exception(e)  # 打印完整的堆栈跟踪
+        logger.exception(e)
         sys.exit(1) 

@@ -37,93 +37,80 @@ env/
 .pydevproject
 .settings/
 .vs/
+.cursor/
 
-# 测试和缓存
-.pytest_cache/
-.coverage
+# Logs and databases
+data/logs/*
+!data/logs/.gitkeep
+data/db/*
+!data/db/.gitkeep
+*.log
+*.sqlite3
+*.db
+
+# Output files
+data/output/*
+!data/output/.gitkeep
+output/
 htmlcov/
+
+# Test coverage
+.coverage
+coverage.xml
+.pytest_cache/
 .tox/
 
-# 日志和数据文件
-*.log
-*.db
-*.sqlite3
+# Environment variables
+config/env/.env
+config/env/.env.example
+config/test/.env.test
 
-# 环境变量
-.env
-.env.*
-
-# 其他
+# Temporary files
+*.tmp
+*.temp
 .DS_Store
 Thumbs.db
-desktop.ini
-*.bak
-*.swp
-*.swo
-*~
 
-# 配置文件
-.env
-.env.*
-!.env.example
-config.ini
-*.conf
-*.cfg
-
-# 依赖
-node_modules/
-bower_components/
-*.min.js
-*.min.css
-
-# 构建
-dist/
-build/
-*.egg-info/
-*.egg
-*.pyc
-*.pyo
-*.pyd
-.Python
-*.so
-
-# 文档
+# Documentation
 docs/_build/
 docs/api/
-site/
 
-# Jupyter Notebook
-.ipynb_checkpoints
-*.ipynb
+# Dependencies
+node_modules/
+package-lock.json
+yarn.lock
 
-# mypy
+# Deployment
+deploy/local/
+.vercel
+.netlify
+
+# Cache
+.cache/
+__pycache__/
 .mypy_cache/
-.dmypy.json
-dmypy.json
+.pytest_cache/
 
-# Pyre
-.pyre/
+# Docker
+.docker/
+docker-compose.override.yml
 
-# pytype
-.pytype/
+# Local development
+*.local
+.local/
 
-# Cython
-*.c
-*.so
-
-# 打包
-*.tar.gz
-*.zip
-*.rar
-*.7z
-
-# 证书
+# Security
 *.pem
 *.key
 *.crt
 *.cer
-*.der
-*.priv
+*.p12
+*.pfx
+
+# Backup files
+*.bak
+*.backup
+*~
 
 # 其他
 *.bak
@@ -132,7 +119,6 @@ dmypy.json
 *~
 .env
 config.local.yaml
-docker-compose.override.yml
 
 # Data directories
 data/logs/*
