@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>爬虫管理系统</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/element-plus"></script>
+    <link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css">
+    <style>
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            margin-bottom: 20px;
+            padding: 20px;
+            background: #f5f7fa;
+            border-radius: 4px;
+        }
+        .status {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+            background: #ecf5ff;
+        }
+        .task-form {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #dcdfe6;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="container">
+            <div class="header">
+                <h1>爬虫管理系统</h1>
+                <div class="status" id="status">检查服务器状态中...</div>
+            </div>
+            
+            <div class="task-form">
+                <h2>创建新任务</h2>
+                <el-form :model="taskForm" label-width="100px">
+                    <el-form-item label="平台">
+                        <el-select v-model="taskForm.platform" placeholder="请选择平台">
+                            <el-option label="小红书" value="xiaohongshu"></el-option>
+                            <el-option label="B站" value="bilibili"></el-option>
+                        </el-select>
+                    </el-form-item>
+                    <el-form-item label="关键词">
+                        <el-input v-model="taskForm.keywords" placeholder="请输入关键词，多个关键词用逗号分隔"></el-input>
+                    </el-form-item>
+                    <el-form-item label="最大页数">
+                        <el-input-number v-model="taskForm.maxPages" :min="1" :max="100"></el-input-number>
+                    </el-form-item>
+                    <el-form-item>
+                        <el-button type="primary" @click="createTask">创建任务</el-button>
+                    </el-form-item>
+                </el-form>
+            </div>
+
+            <div class="task-list">
+                <h2>任务列表</h2>
+                <el-table :data="tasks" style="width: 100%">
+                    <el-table-column prop="id" label="任务ID" width="180"></el-table-column>
+                    <el-table-column prop="platform" label="平台" width="120"></el-table-column>
+                    <el-table-column prop="keywords" label="关键词"></el-table-column>
+                    <el-table-column prop="status" label="状态" width="120"></el-table-column>
+                    <el-table-column prop="progress" label="进度" width="120">
+                        <template #default="scope">
+                            <el-progress :percentage="scope.row.progress"></el-progress>
+                        </template>
+                    </el-table-column>
+                    <el-table-column label="操作" width="120">
+                        <template #default="scope">
+                            <el-button size="small" type="danger" @click="stopTask(scope.row.id)">停止</el-button>
+                        </template>
+                    </el-table-column>
+                </el-table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp, ref } = Vue;
+        const app = createApp({
+            setup() {
+                const API_BASE_URL = 'http://127.0.0.1:8000/api/v1/crawlers';
+                const taskForm = ref({
+                    platform: '',
+                    keywords: '',
+                    maxPages: 10
+                });
+                const tasks = ref([]);
+                
+                // 检查服务器状态
+                const checkServerStatus = async () => {
+                    try {
+                        const response = await fetch('http://127.0.0.1:8000/health');
+                        const data = await response.json();
+                        document.getElementById('status').textContent = 
+                            `服务器状态: ${data.status} | 版本: ${data.version} | 环境: ${data.environment}`;
+                    } catch (error) {
+                        document.getElementById('status').textContent = '连接错误: ' + error.message;
+                    }
+                };
+
+                // 创建任务
+                const createTask = async () => {
+                    if (!taskForm.value.platform || !taskForm.value.keywords) {
+                        ElMessage.warning('请填写完整的任务信息');
+                        return;
+                    }
+                    
+                    try {
+                        const response = await fetch(`${API_BASE_URL}/tasks`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                platform: taskForm.value.platform,
+                                keywords: taskForm.value.keywords.split(',').map(k => k.trim()),
+                                max_pages: taskForm.value.maxPages
+                            })
+                        });
+                        
+                        if (response.ok) {
+                            const data = await response.json();
+                            ElMessage.success('任务创建成功');
+                            loadTasks();
+                            // 清空表单
+                            taskForm.value = {
+                                platform: '',
+                                keywords: '',
+                                maxPages: 10
+                            };
+                        } else {
+                            const error = await response.json();
+                            ElMessage.error('任务创建失败: ' + (error.detail || '未知错误'));
+                        }
+                    } catch (error) {
+                        ElMessage.error('请求失败: ' + error.message);
+                        console.error('创建任务错误:', error);
+                    }
+                };
+
+                // 加载任务列表
+                const loadTasks = async () => {
+                    try {
+                        const response = await fetch(`${API_BASE_URL}/tasks`);
+                        if (response.ok) {
+                            const data = await response.json();
+                            tasks.value = data;
+                        } else {
+                            const error = await response.json();
+                            console.error('加载任务列表失败:', error);
+                        }
+                    } catch (error) {
+                        console.error('加载任务列表错误:', error);
+                    }
+                };
+
+                // 停止任务
+                const stopTask = async (taskId) => {
+                    try {
+                        const response = await fetch(`${API_BASE_URL}/tasks/${taskId}/stop`, {
+                            method: 'POST'
+                        });
+                        if (response.ok) {
+                            ElMessage.success('任务已停止');
+                            loadTasks();
+                        } else {
+                            const error = await response.json();
+                            ElMessage.error('停止任务失败: ' + (error.detail || '未知错误'));
+                        }
+                    } catch (error) {
+                        ElMessage.error('请求失败: ' + error.message);
+                        console.error('停止任务错误:', error);
+                    }
+                };
+
+                // 初始化
+                checkServerStatus();
+                loadTasks();
+
+                // 定时刷新任务列表
+                setInterval(loadTasks, 5000);
+
+                return {
+                    taskForm,
+                    tasks,
+                    createTask,
+                    stopTask
+                };
+            }
+        });
+
+        app.use(ElementPlus);
+        app.mount('#app');
+    </script>
+</body>
+</html> 

@@ -3,7 +3,7 @@
 ## 部署架构
 
 ```
-                                    [负载均衡]
+                                    [负载均衡 Nginx]
                                          |
                     +-------------------+-------------------+
                     |                   |                   |
@@ -11,7 +11,7 @@
                     |                   |                   |
         +----------+----------+--------+----------+---------+----------+
         |          |          |        |          |         |          |
-  [爬虫worker] [处理worker] [缓存]  [数据库]   [消息队列]  [监控]    [日志]
+  [爬虫进程] [处理进程]    [Redis]  [PostgreSQL] [RabbitMQ] [Prometheus] [日志]
 ```
 
 ## 系统要求
@@ -21,235 +21,322 @@
 - 内存: 8GB
 - 磁盘: 100GB
 - 操作系统: Ubuntu 20.04/CentOS 8
+- Python: 3.8+
 
 ### 推荐配置
 - CPU: 8核
 - 内存: 16GB
 - 磁盘: 500GB
 - 操作系统: Ubuntu 22.04/CentOS 8
+- Python: 3.10+
 
 ## 环境准备
 
-### 1. 安装Docker
-```bash
-# Ubuntu
-curl -fsSL https://get.docker.com -o get-docker.sh
-sudo sh get-docker.sh
-
-# CentOS
-sudo yum install -y yum-utils
-sudo yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
-sudo yum install docker-ce docker-ce-cli containerd.io
-```
-
-### 2. 安装Docker Compose
-```bash
-sudo curl -L "https://github.com/docker/compose/releases/download/v2.24.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-sudo chmod +x /usr/local/bin/docker-compose
-```
-
-### 3. 配置系统参数
-```bash
-# 编辑系统限制
-sudo vim /etc/security/limits.conf
-```
-添加以下内容：
-```
-*         soft    nofile      65535
-*         hard    nofile      65535
-```
-
-```bash
-# 编辑系统参数
-sudo vim /etc/sysctl.conf
-```
-添加以下内容：
-```
-net.ipv4.tcp_max_syn_backlog = 8192
-net.core.somaxconn = 8192
-```
-
-### 4. 安装必要工具
+### 1. 安装系统依赖
 ```bash
 # Ubuntu
 sudo apt update
-sudo apt install -y nginx certbot python3-certbot-nginx
+sudo apt install -y python3 python3-pip python3-venv nginx postgresql redis-server rabbitmq-server supervisor
 
 # CentOS
-sudo yum install -y epel-release
-sudo yum install -y nginx certbot python3-certbot-nginx
+sudo yum update
+sudo yum install -y python3 python3-pip nginx postgresql-server redis rabbitmq-server supervisor
 ```
 
-## 部署步骤
-
-### 1. 克隆代码
+### 2. 配置PostgreSQL
 ```bash
-git clone <repository_url>
-cd crawler-project
+# Ubuntu
+sudo systemctl start postgresql
+sudo systemctl enable postgresql
+sudo -u postgres psql
+
+# CentOS
+sudo postgresql-setup --initdb
+sudo systemctl start postgresql
+sudo systemctl enable postgresql
+sudo -u postgres psql
 ```
 
-### 2. 配置环境变量
+创建数据库和用户：
+```sql
+CREATE DATABASE crawler;
+CREATE USER crawler_user WITH PASSWORD 'your_secure_password';
+GRANT ALL PRIVILEGES ON DATABASE crawler TO crawler_user;
+```
+
+### 3. 配置Redis
+```bash
+sudo systemctl start redis
+sudo systemctl enable redis
+
+# 编辑Redis配置
+sudo vim /etc/redis/redis.conf
+```
+
+### 4. 配置RabbitMQ
+```bash
+sudo systemctl start rabbitmq-server
+sudo systemctl enable rabbitmq-server
+
+# 创建RabbitMQ用户
+sudo rabbitmqctl add_user crawler_user your_secure_password
+sudo rabbitmqctl set_user_tags crawler_user administrator
+sudo rabbitmqctl set_permissions -p / crawler_user ".*" ".*" ".*"
+```
+
+## 应用部署
+
+### 1. 创建应用用户
+```bash
+sudo useradd -m -s /bin/bash crawler
+sudo usermod -aG www-data crawler
+```
+
+### 2. 部署代码
+```bash
+# 切换到应用用户
+sudo su - crawler
+
+# 克隆代码
+git clone <repository_url> /home/crawler/app
+cd /home/crawler/app
+
+# 创建虚拟环境
+python3 -m venv venv
+source venv/bin/activate
+
+# 安装依赖
+pip install -r requirements.txt
+```
+
+### 3. 配置环境变量
 ```bash
 cp config/env/.env.example config/env/.env
-# 编辑 .env 文件设置生产环境配置
+vim config/env/.env
 ```
 
-### 3. 配置Nginx
+### 4. 配置Supervisor
 ```bash
-sudo cp deploy/nginx/nginx.conf /etc/nginx/nginx.conf
-sudo cp deploy/nginx/conf.d/* /etc/nginx/conf.d/
+sudo vim /etc/supervisor/conf.d/crawler.conf
+```
+
+```ini
+[program:crawler-api]
+command=/home/crawler/app/venv/bin/python -m src.main
+directory=/home/crawler/app
+user=crawler
+autostart=true
+autorestart=true
+stderr_logfile=/var/log/crawler/api-err.log
+stdout_logfile=/var/log/crawler/api-out.log
+environment=
+    PYTHONPATH="/home/crawler/app",
+    ENV="production"
+
+[program:crawler-worker]
+command=/home/crawler/app/venv/bin/python -m src.worker
+directory=/home/crawler/app
+user=crawler
+autostart=true
+autorestart=true
+stderr_logfile=/var/log/crawler/worker-err.log
+stdout_logfile=/var/log/crawler/worker-out.log
+environment=
+    PYTHONPATH="/home/crawler/app",
+    ENV="production"
+
+[program:crawler-processor]
+command=/home/crawler/app/venv/bin/python -m src.processor
+directory=/home/crawler/app
+user=crawler
+autostart=true
+autorestart=true
+stderr_logfile=/var/log/crawler/processor-err.log
+stdout_logfile=/var/log/crawler/processor-out.log
+environment=
+    PYTHONPATH="/home/crawler/app",
+    ENV="production"
+```
+
+### 5. 配置Nginx
+```bash
+sudo vim /etc/nginx/sites-available/crawler
+```
+
+```nginx
+upstream crawler_api {
+    server 127.0.0.1:8000;
+    server 127.0.0.1:8001;
+    server 127.0.0.1:8002;
+}
+
+server {
+    listen 80;
+    server_name example.com;
+
+    access_log /var/log/nginx/crawler-access.log;
+    error_log /var/log/nginx/crawler-error.log;
+
+    location / {
+        proxy_pass http://crawler_api;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}
+```
+
+```bash
+sudo ln -s /etc/nginx/sites-available/crawler /etc/nginx/sites-enabled/
 sudo nginx -t
 sudo systemctl restart nginx
-```
-
-### 4. 配置SSL证书
-```bash
-sudo certbot --nginx -d example.com -d www.example.com
-```
-
-### 5. 启动服务
-```bash
-# 生产环境
-docker-compose -f docker-compose.prod.yml up -d
-
-# 查看服务状态
-docker-compose ps
 ```
 
 ### 6. 配置监控
 
 #### Prometheus
 ```bash
-# 复制配置文件
-cp deploy/prometheus/prometheus.yml /etc/prometheus/
-cp deploy/prometheus/rules/* /etc/prometheus/rules/
+# 安装Prometheus
+sudo apt install -y prometheus
 
-# 启动Prometheus
-docker-compose -f deploy/prometheus/docker-compose.yml up -d
+# 配置Prometheus
+sudo vim /etc/prometheus/prometheus.yml
+```
+
+```yaml
+scrape_configs:
+  - job_name: 'crawler'
+    static_configs:
+      - targets: ['localhost:8000']
 ```
 
 #### Grafana
 ```bash
-# 复制配置文件
-cp deploy/grafana/provisioning/* /etc/grafana/provisioning/
+# 安装Grafana
+sudo apt install -y grafana
 
-# 启动Grafana
-docker-compose -f deploy/grafana/docker-compose.yml up -d
+# 启动服务
+sudo systemctl start grafana-server
+sudo systemctl enable grafana-server
 ```
 
 ## 维护指南
 
 ### 1. 日志管理
 ```bash
-# 查看容器日志
-docker-compose logs -f [service_name]
+# 创建日志目录
+sudo mkdir -p /var/log/crawler
+sudo chown -R crawler:crawler /var/log/crawler
 
-# 清理日志
-find /var/log/crawler/ -type f -name "*.log" -mtime +30 -delete
+# 配置日志轮转
+sudo vim /etc/logrotate.d/crawler
+```
+
+```
+/var/log/crawler/*.log {
+    daily
+    rotate 14
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0640 crawler crawler
+}
 ```
 
 ### 2. 备份
 ```bash
 # 备份数据库
-docker-compose exec db pg_dump -U postgres crawler > backup.sql
+pg_dump -U crawler_user crawler > /home/crawler/backups/db_$(date +%Y%m%d).sql
 
 # 备份配置
-tar -czf config_backup.tar.gz config/
+tar -czf /home/crawler/backups/config_$(date +%Y%m%d).tar.gz /home/crawler/app/config/
 ```
 
 ### 3. 更新
 ```bash
-# 拉取最新代码
+cd /home/crawler/app
 git pull
-
-# 重新构建并启动
-docker-compose -f docker-compose.prod.yml up -d --build
+source venv/bin/activate
+pip install -r requirements.txt
+sudo supervisorctl restart all
 ```
 
-### 4. 回滚
+### 4. 服务管理
 ```bash
-# 回滚到指定版本
-git checkout <version_tag>
-docker-compose -f docker-compose.prod.yml up -d --build
+# 查看服务状态
+sudo supervisorctl status
+
+# 重启服务
+sudo supervisorctl restart crawler-api
+sudo supervisorctl restart crawler-worker
+sudo supervisorctl restart crawler-processor
+
+# 查看日志
+tail -f /var/log/crawler/*.log
 ```
 
 ## 监控和告警
 
-### 1. 监控指标
-- 系统资源使用率
+### 1. 系统监控
+- 使用 Prometheus 收集指标
+- 使用 Grafana 展示仪表盘
+- 使用 node_exporter 监控系统资源
+
+### 2. 应用监控
 - API响应时间
-- 错误率
+- 错误率统计
 - 任务队列长度
 - 爬虫成功率
 
-### 2. 告警规则
-- CPU使用率 > 80%
-- 内存使用率 > 80%
-- API响应时间 > 1s
-- 错误率 > 1%
-- 队列堆积 > 1000
+### 3. 告警配置
+- 配置 Alertmanager
+- 设置告警规则
+- 配置通知渠道（邮件/Slack/钉钉）
 
-### 3. 告警通道
-- 邮件
-- Slack
-- 钉钉
-- 企业微信
+## 故障处理
+
+### 1. 服务不可用
+1. 检查进程状态：`ps aux | grep python`
+2. 检查日志：`tail -f /var/log/crawler/*.log`
+3. 检查系统资源：`top`, `free -m`, `df -h`
+4. 检查网络连接：`netstat -tunlp`
+
+### 2. 性能问题
+1. 使用 `top` 检查 CPU 使用
+2. 使用 `free` 检查内存使用
+3. 使用 `iostat` 检查磁盘 I/O
+4. 检查数据库性能
+
+### 3. 数据问题
+1. 检查数据库连接
+2. 检查数据一致性
+3. 恢复数据备份
 
 ## 安全配置
 
-### 1. 防火墙
+### 1. 系统安全
 ```bash
-# 开放必要端口
+# 配置防火墙
 sudo ufw allow 80/tcp
 sudo ufw allow 443/tcp
 sudo ufw allow 3000/tcp  # Grafana
 sudo ufw allow 9090/tcp  # Prometheus
 ```
 
-### 2. 证书管理
-```bash
-# 更新SSL证书
-sudo certbot renew
-```
+### 2. 应用安全
+- 使用 HTTPS
+- 配置 WAF
+- 限制 API 访问
+- 加密敏感数据
 
-### 3. 密码管理
-- 使用密钥管理服务
-- 定期轮换密码
-- 使用强密码策略
-
-## 故障处理
-
-### 1. 服务不可用
-1. 检查容器状态
-2. 检查日志
-3. 检查系统资源
-4. 检查网络连接
-
-### 2. 性能问题
-1. 检查监控指标
-2. 分析慢查询
-3. 检查资源使用
-4. 优化配置
-
-### 3. 数据问题
-1. 检查数据一致性
-2. 恢复备份
-3. 修复数据
-
-## 扩展指南
-
-### 1. 水平扩展
-1. 增加API节点
-2. 配置负载均衡
-3. 调整数据库连接
-
-### 2. 垂直扩展
-1. 增加系统资源
-2. 优化配置参数
-3. 升级硬件
+### 3. 数据安全
+- 定期备份
+- 数据加密
+- 访问控制
+- 审计日志
 
 ## 参考资料
-- [Docker文档](https://docs.docker.com/)
-- [Nginx文档](https://nginx.org/en/docs/)
-- [Prometheus文档](https://prometheus.io/docs/)
-- [Grafana文档](https://grafana.com/docs/)
+- [Nginx 文档](https://nginx.org/en/docs/)
+- [PostgreSQL 文档](https://www.postgresql.org/docs/)
+- [Supervisor 文档](http://supervisord.org/)

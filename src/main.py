@@ -11,6 +11,7 @@ from loguru import logger
 from src.database import init_db
 from src.config import settings
 from src.utils.logger import setup_logger
+from api.routes import crawler_api
 
 # 配置日志
 setup_logger(
@@ -21,7 +22,7 @@ setup_logger(
 
 # 创建应用
 app = FastAPI(
-    title=settings.APP_NAME,
+    title="爬虫管理系统",
     description="提供各种爬虫工具的API接口",
     version=settings.APP_VERSION,
     debug=settings.DEBUG
@@ -30,7 +31,7 @@ app = FastAPI(
 # CORS配置
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 简化CORS配置
+    allow_origins=["*"],  # 在生产环境中应该设置具体的域名
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -48,9 +49,9 @@ async def startup_event():
         logger.info("数据库初始化完成")
         
         # 其他初始化工作
-        logger.info(f"环境: {settings.APP_ENV}")
-        logger.info(f"调试模式: {settings.DEBUG}")
-        logger.info(f"数据库类型: {settings.DB_TYPE}")
+        logger.info(f"环境: {os.getenv('APP_ENV', 'development')}")
+        logger.info(f"调试模式: {app.debug}")
+        logger.info(f"数据库类型: {os.getenv('DB_TYPE', 'sqlite')}")
         logger.info("API服务启动完成")
     except Exception as e:
         logger.error(f"服务启动失败: {str(e)}")
@@ -60,10 +61,7 @@ async def startup_event():
 async def root():
     """根路径"""
     return {
-        "message": f"{settings.APP_NAME} API服务正在运行",
-        "version": settings.APP_VERSION,
-        "time": datetime.now().isoformat(),
-        "environment": settings.APP_ENV
+        "message": "爬虫管理系统API服务"
     }
 
 @app.get("/health")
@@ -73,8 +71,7 @@ async def health_check():
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
         "version": settings.APP_VERSION,
-        "environment": settings.APP_ENV,
-        "database": settings.DB_TYPE
+        "environment": os.getenv("APP_ENV", "development")
     }
 
 @app.exception_handler(Exception)
@@ -98,9 +95,8 @@ async def global_exception_handler(request: Request, exc: Exception):
         }
     )
 
-# 在这里注册路由模块
-# from src.api import router as api_router
-# app.include_router(api_router, prefix="/api/v1")
+# 注册路由
+app.include_router(crawler_api.router, prefix="/api/v1/crawlers", tags=["crawlers"])
 
 if __name__ == "__main__":
     import uvicorn
@@ -110,7 +106,7 @@ if __name__ == "__main__":
         uvicorn.run(
             "src.main:app",
             host="0.0.0.0",  # 直接使用固定值
-            port=8888,       # 直接使用固定值
+            port=8000,       # 直接使用固定值
             log_level="info",
             reload=False
         )

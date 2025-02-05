@@ -1,64 +1,42 @@
 <template>
-  <div class="app-container">
-    <el-container>
-      <el-header>
-        <h1>爬虫工具</h1>
-      </el-header>
-      
-      <el-container>
-        <el-aside width="200px">
-          <el-menu
-            router
-            :default-active="$route.path"
-            class="el-menu-vertical">
-            <el-menu-item index="/">
-              <el-icon><HomeFilled /></el-icon>
-              <span>首页</span>
-            </el-menu-item>
-            <el-menu-item index="/tasks">
-              <el-icon><List /></el-icon>
-              <span>任务列表</span>
-            </el-menu-item>
-            <el-menu-item index="/settings">
-              <el-icon><Setting /></el-icon>
-              <span>设置</span>
-            </el-menu-item>
-          </el-menu>
-        </el-aside>
-        
-        <el-main>
-          <router-view></router-view>
-        </el-main>
-      </el-container>
-    </el-container>
+  <div id="app">
+    <nav>
+      <router-link to="/">首页</router-link> |
+      <router-link to="/tasks">任务</router-link> |
+      <router-link to="/settings">设置</router-link>
+    </nav>
+    <router-view></router-view>
   </div>
 </template>
 
-<script setup>
-import { HomeFilled, List, Setting } from '@element-plus/icons-vue'
+<script>
+export default {
+  name: 'App'
+}
 </script>
 
 <style>
-.app-container {
-  height: 100vh;
-}
-
-.el-header {
-  background-color: #409EFF;
-  color: white;
-  line-height: 60px;
+#app {
+  font-family: Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   text-align: center;
+  color: #2c3e50;
+  margin-top: 60px;
 }
 
-.el-aside {
-  background-color: #f5f7fa;
+nav {
+  padding: 30px;
 }
 
-.el-menu-vertical {
-  border-right: none;
+nav a {
+  font-weight: bold;
+  color: #2c3e50;
+  text-decoration: none;
+  margin: 0 10px;
 }
 
-.el-main {
-  padding: 20px;
+nav a.router-link-exact-active {
+  color: #42b983;
 }
 </style> 

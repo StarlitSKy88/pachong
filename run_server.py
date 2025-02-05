@@ -4,6 +4,9 @@ import socket
 import os
 from pathlib import Path
 from loguru import logger
+from src.main import app
+from src.database.connection import engine
+from src.models.task import Base
 
 # 配置日志
 log_path = Path("logs")
@@ -23,6 +26,10 @@ def is_port_in_use(port: int) -> bool:
             return False
         except socket.error:
             return True
+
+def init_db():
+    """初始化数据库"""
+    Base.metadata.create_all(bind=engine)
 
 def main():
     # 使用固定配置
@@ -45,6 +52,9 @@ def main():
         logger.info(f"- 工作进程数: {workers}")
         logger.info(f"- 调试模式: {reload}")
         logger.info(f"- 当前工作目录: {os.getcwd()}")
+        
+        # 初始化数据库
+        init_db()
         
         # 启动服务器
         config = uvicorn.Config(

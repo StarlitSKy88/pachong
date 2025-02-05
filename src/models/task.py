@@ -1,20 +1,19 @@
-from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey
-from sqlalchemy.orm import relationship
+from sqlalchemy import Column, String, Integer, DateTime, JSON
+from sqlalchemy.ext.declarative import declarative_base
 from datetime import datetime
-from . import Base
+
+Base = declarative_base()
 
 class Task(Base):
     """任务模型"""
     __tablename__ = 'tasks'
     
-    id = Column(Integer, primary_key=True)
-    type = Column(String(50), nullable=False)  # 任务类型
-    status = Column(String(20), default='pending')  # 任务状态
-    priority = Column(Integer, default=0)  # 优先级
-    params = Column(Text)  # 任务参数
-    result = Column(Text)  # 任务结果
-    error = Column(Text)  # 错误信息
-    retry_count = Column(Integer, default=0)  # 重试次数
+    id = Column(String, primary_key=True)
+    platform = Column(String, nullable=False)
+    keywords = Column(JSON, nullable=False)
+    status = Column(String, nullable=False)
+    progress = Column(Integer, default=0)
+    filters = Column(JSON)
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
     
@@ -22,13 +21,11 @@ class Task(Base):
         """转换为字典"""
         return {
             'id': self.id,
-            'type': self.type,
+            'platform': self.platform,
+            'keywords': self.keywords,
             'status': self.status,
-            'priority': self.priority,
-            'params': self.params,
-            'result': self.result,
-            'error': self.error,
-            'retry_count': self.retry_count,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+            'progress': self.progress,
+            'filters': self.filters,
+            'created_at': self.created_at,
+            'updated_at': self.updated_at
         } 
