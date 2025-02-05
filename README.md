@@ -1,78 +1,108 @@
-# 爬虫工具 API
+# 爬虫项目
 
-这是一个提供网页爬虫功能的 API 服务。
+## 项目结构
 
-## 功能特点
-
-- 支持多平台内容抓取
-- 提供 RESTful API 接口
-- 支持异步处理
-- 内置监控和日志
-- 支持容器化部署
-
-## 部署方式
-
-### 1. 本地运行
-
-```bash
-# 安装依赖
-pip install -r requirements.txt
-
-# 启动服务
-python src/main.py
+```
+.
+├── src/                    # 源代码目录
+│   ├── api/               # API服务
+│   ├── cli/               # 命令行工具
+│   ├── crawlers/          # 爬虫实现
+│   ├── database/          # 数据库模块
+│   ├── models/            # 数据模型
+│   ├── processors/        # 数据处理器
+│   ├── monitor/           # 监控模块
+│   ├── utils/             # 工具类
+│   ├── web/              # Web服务
+│   ├── export/           # 导出模块
+│   ├── themes/           # 主题模块
+│   ├── generators/       # 生成器模块
+│   └── scheduler/        # 调度模块
+│
+├── data/                  # 数据目录
+│   ├── db/               # 数据库文件
+│   ├── logs/             # 日志文件
+│   ├── output/           # 输出文件
+│   ├── cache/            # 缓存文件
+│   ├── downloads/        # 下载文件
+│   └── reports/          # 报告文件
+│
+├── config/               # 配置目录
+│   ├── env/             # 环境配置
+│   ├── test/            # 测试配置
+│   └── deploy/          # 部署配置
+│
+├── tests/                # 测试目录
+│   ├── unit/            # 单元测试
+│   ├── integration/     # 集成测试
+│   ├── performance/     # 性能测试
+│   └── stress/          # 压力测试
+│
+├── deploy/               # 部署配置
+│   ├── docker/          # Docker配置
+│   ├── grafana/         # Grafana配置
+│   ├── prometheus/      # Prometheus配置
+│   └── nginx/           # Nginx配置
+│
+├── docs/                 # 文档目录
+│   ├── api/             # API文档
+│   └── development/     # 开发文档
+│
+└── frontend/            # 前端目录
+    ├── src/             # 前端源码
+    └── public/          # 静态资源
 ```
 
-### 2. Docker 部署
+## 配置说明
 
-```bash
-# 构建镜像
-docker build -t crawler-api .
+- 环境配置文件位于 `config/env/` 目录
+- 测试配置文件位于 `config/test/` 目录
+- 部署配置文件位于 `config/deploy/` 目录
 
-# 运行容器
-docker run -p 8000:8000 crawler-api
-```
+## 数据目录说明
 
-### 3. 腾讯云 Webify 部署
-
-1. 在腾讯云 Webify 控制台创建应用
-2. 选择 Python 环境
-3. 上传代码或关联代码仓库
-4. 等待自动部署完成
-
-### 4. 阿里云 SAE 部署
-
-1. 在阿里云 SAE 控制台创建应用
-2. 选择 Python 环境
-3. 上传代码或关联代码仓库
-4. 配置环境变量
-5. 等待部署完成
-
-## API 文档
-
-启动服务后访问 `/docs` 路径查看详细的 API 文档。
-
-## 环境变量
-
-- `PYTHONPATH`: 项目根目录
-- `PYTHONIOENCODING`: UTF-8
-- `TZ`: 时区设置
+- 数据库文件存储在 `data/db/` 目录
+- 日志文件存储在 `data/logs/` 目录
+- 输出文件存储在 `data/output/` 目录
+- 缓存文件存储在 `data/cache/` 目录
+- 下载文件存储在 `data/downloads/` 目录
+- 报告文件存储在 `data/reports/` 目录
 
 ## 开发说明
 
-1. 代码规范遵循 PEP 8
-2. 使用 Black 进行代码格式化
-3. 使用 Flake8 进行代码检查
-4. 使用 MyPy 进行类型检查
+1. 安装依赖
+```bash
+pip install -r requirements.txt
+```
 
-## 监控和日志
+2. 配置环境
+- 复制 `config/env/.env.example` 到 `config/env/.env`
+- 根据需要修改配置
 
-- 健康检查接口: `/health`
-- 日志文件: `api.log`
-- 支持 Prometheus 指标采集
+3. 运行测试
+```bash
+python -m pytest
+```
 
-## 注意事项
+4. 启动服务
+```bash
+python src/main.py
+```
 
-1. 确保系统编码设置正确
-2. 注意网络访问限制
-3. 遵守目标网站的爬虫规则
-4. 定期检查和更新依赖
+## 部署说明
+
+使用Docker Compose部署：
+```bash
+docker-compose up -d
+```
+
+## 监控说明
+
+- Grafana仪表盘访问：http://localhost:3000
+- Prometheus指标访问：http://localhost:9090
+
+## 文档
+
+- API文档：docs/api/
+- 开发文档：docs/development/
+- 部署文档：docs/deployment/
